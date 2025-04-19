@@ -1,0 +1,73 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/kubernetes-helm
+{
+	"name": "Homelab",
+	"build": { "dockerfile": "Dockerfile", "context": ".." },
+
+	"features": {
+		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+			"enableNonRootDocker": true
+		},
+		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+			"minikube": "none"
+		},
+		"./local-features/copy-kube-config": {},
+
+
+		"ghcr.io/devcontainers-extra/features/argo-cd:1": {},
+
+		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"ghcr.io/audacioustux/devcontainers/k9s:1": {},
+
+		"ghcr.io/va-h/devcontainers-features/difftastic:1": {},
+		"ghcr.io/eitsupi/devcontainer-features/jq-likes:2": {
+		  "jqVersion": "latest",
+		  "yqVersion": "latest"
+		},
+
+		"ghcr.io/devcontainers-contrib/features/sops:1": {},
+		"ghcr.io/devcontainers-contrib/features/age:1": { "version": "v1.1.1" },
+		"ghcr.io/devcontainers-contrib/features/age-keygen:1": { "version": "v1.1.1" }
+	},
+
+	"initializeCommand": "cd .devcontainer && bash ensure-mount-sources",
+	"mounts": [
+		{
+			"source": "${env:HOME}${env:USERPROFILE}/.kube",
+			"target": "/usr/local/share/kube-localhost",
+			"type": "bind"
+		},
+		// Mount bash aliases
+		{
+			"source": "${env:HOME}${env:USERPROFILE}/.bash_aliases",
+			"target": "/home/vscode/.bash_aliases",
+			"type": "bind"
+		},
+		// bash history
+		"source=homelab-bashhistory,target=/commandhistory"
+	],
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": "kubectl version",
+
+	// Configure tool-specific properties.
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"usernamehw.errorlens",
+				"eamodio.gitlens",
+				"ms-kubernetes-tools.vscode-kubernetes-tools"
+			]
+		}
+	},
+
+	"remoteEnv": {
+		"SYNC_LOCALHOST_KUBECONFIG": "true"
+	}
+
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "root"
+}
