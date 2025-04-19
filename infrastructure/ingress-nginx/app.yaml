@@ -20,5 +20,7 @@ spec:
         publishService:
           enabled: true
   syncPolicy:
+    automated:
+      prune: true
     syncOptions:
       - CreateNamespace=true

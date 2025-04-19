@@ -17,6 +17,8 @@ spec:
     helm:
       releaseName: metallb
   syncPolicy:
+    automated:
+      prune: true
     syncOptions:
       - CreateNamespace=true
     managedNamespaceMetadata:
