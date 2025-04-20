@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gandi-ddns-updater
+  namespace: external-dns
+spec:
+  schedule: "*/5 * * * *" # every 5 minutes
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: gandi-ddns
+              image: curlimages/curl:latest
+              command:
+                - sh
+                - -c
+                - |
+                  DOMAIN="boiss.it"
+                  RECORD="@"
+                  NEW_IP=$(curl -s ifconfig.me)
+                  OLD_IP=$(dig +short $DOMAIN @8.8.8.8)
+
+                  if [ "$NEW_IP" != "$OLD_IP" ]; then
+                    echo "IP changed: updating $DOMAIN to $NEW_IP"
+                    curl -X PUT \
+                      -H "Authorization: Apikey $GANDI_PAT" \
+                      -H "Content-Type: application/json" \
+                      -d "{\"rrset_values\":[\"$NEW_IP\"], \"rrset_ttl\": 300}" \
+                      https://api.gandi.net/v5/livedns/domains/$DOMAIN/records/$RECORD/A
+                  else
+                    echo "IP unchanged: $NEW_IP"
+                  fi
+              envFrom:
+                - secretRef:
+                    name: gandi-pat
+          restartPolicy: OnFailure

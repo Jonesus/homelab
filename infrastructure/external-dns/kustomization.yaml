@@ -9,3 +9,4 @@ resources:
   - clusterrolebinding.yaml
   - gandi-pat.sealed.yaml
   - deployment.yaml
+  - cronjob.yaml

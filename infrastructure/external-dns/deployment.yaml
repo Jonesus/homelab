@@ -24,6 +24,7 @@ spec:
             - --domain-filter=boiss.it
             - --provider=gandi
             - --txt-owner-id=external-dns
+            - --default-targets=boiss.it
           envFrom:
             - secretRef:
                 name: gandi-pat
