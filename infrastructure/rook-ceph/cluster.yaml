@@ -19,6 +19,10 @@ spec:
     helm:
       valuesObject:
         operatorNamespace: rook-ceph
+        cephClusterSpec:
+          mon:
+            count: 2
+
   syncPolicy:
     automated:
       prune: true
