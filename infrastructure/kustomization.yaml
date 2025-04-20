@@ -7,3 +7,4 @@ resources:
   - metallb/resources.yaml
   - ingress-nginx/app.yaml
   - sealed-secrets/app.yaml
+  - external-dns/app.yaml
