@@ -5,6 +5,8 @@ metadata:
   namespace: external-dns
 spec:
   schedule: "*/5 * * * *" # every 5 minutes
+  successfulJobsHistoryLimit: 0
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
       template:
