@@ -10,3 +10,4 @@ resources:
   - external-dns/app.yaml
   - cert-manager/app.yaml
   - cert-manager/resources.yaml
+  - generic-device-plugin/app.yaml
