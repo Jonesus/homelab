@@ -6,3 +6,4 @@ resources:
   - metallb/app.yaml
   - metallb/resources.yaml
   - ingress-nginx/app.yaml
+  - sealed-secrets/app.yaml
