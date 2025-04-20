@@ -19,7 +19,7 @@ spec:
                   DOMAIN="boiss.it"
                   RECORD="@"
                   NEW_IP=$(curl -s ifconfig.me)
-                  OLD_IP=$(dig +short $DOMAIN @8.8.8.8)
+                  OLD_IP=$(nslookup $DOMAIN 8.8.8.8 | grep "Address" | awk 'NR==2 { print $2 }')
 
                   if [ "$NEW_IP" != "$OLD_IP" ]; then
                     echo "IP changed: updating $DOMAIN to $NEW_IP"
