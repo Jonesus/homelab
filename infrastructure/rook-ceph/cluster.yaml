@@ -23,11 +23,8 @@ spec:
           mon:
             count: 2
           storage:
-            useAllDevices: false
-            nodes:
-              - name: tupu
-                devices:
-                  - name: sdb
+            useAllNodes: true
+            useAllDevices: true
 
   syncPolicy:
     automated:
