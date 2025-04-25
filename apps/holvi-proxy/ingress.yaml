@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: holvi-ingress
+  namespace: holvi
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: holvi-tls
+      hosts:
+        - holvi.boiss.it
+  rules:
+    - host: holvi.boiss.it
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: holvi
+                port:
+                  number: 7277
