@@ -13,3 +13,5 @@ resources:
   - generic-device-plugin/app.yaml
   - rook-ceph/app.yaml
   - rook-ceph/cluster.yaml
+  - node-feature-discovery/app.yaml
+  - node-feature-discovery/resources.yaml
