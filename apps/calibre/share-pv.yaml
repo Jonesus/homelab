@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nfs-calibre-pv
+  namespace: calibre
+spec:
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: 192.168.1.103
+    path: /cluster/calibre
+  mountOptions:
+    - nfsvers=4
+  capacity:
+    storage: 5Gi

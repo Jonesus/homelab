@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: calibre
+  namespace: calibre
+  labels:
+    app: calibre
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: calibre
+  template:
+    metadata:
+      labels:
+        app: calibre
+    spec:
+      containers:
+        - image: lscr.io/linuxserver/calibre-web:latest
+          name: calibre
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: TZ
+              value: "Europe/Helsinki"
+            - name: DOCKER_MODS
+              value: linuxserver/mods:universal-calibre
+          volumeMounts:
+            - name: calibre-data
+              mountPath: /config
+              subPath: config
+            - name: calibre-data
+              mountPath: /books
+              subPath: library
+          resources:
+            requests:
+              cpu: 10m
+              memory: 128Mi
+            limits: 
+              cpu: 500m
+              memory: 512Mi
+      restartPolicy: Always
+      volumes:
+        - name: calibre-data
+          persistentVolumeClaim:
+            claimName: nfs-calibre-pvc

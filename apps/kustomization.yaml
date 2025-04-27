@@ -5,3 +5,4 @@ resources:
   - project.yaml
   - homeassistant-proxy/app.yaml
   - holvi-proxy/app.yaml
+  - calibre/app.yaml
