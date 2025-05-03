@@ -20,11 +20,16 @@ spec:
       valuesObject:
         operatorNamespace: rook-ceph
         cephClusterSpec:
-          mon:
-            count: 2
           storage:
-            useAllNodes: true
-            useAllDevices: true
+            useAllNodes: false
+            useAllDevices: false
+            nodes:
+              - name: tupu
+                devices:
+                  - name: sdb
+              - name: lupu
+                devices:
+                  - name: sda
           
         toolbox:
           enabled: true
