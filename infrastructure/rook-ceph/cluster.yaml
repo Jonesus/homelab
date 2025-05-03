@@ -23,13 +23,14 @@ spec:
           storage:
             useAllNodes: false
             useAllDevices: false
+            deviceFilter: ""
             nodes:
               - name: tupu
                 devices:
-                  - name: sdb
+                  - name: /dev/disk/by-id/ata-APPLE_HDD_HTS541010A9E662_J5800013JD042A
               - name: lupu
                 devices:
-                  - name: sda
+                  - name: /dev/disk/by-id/ata-APPLE_HDD_HTS541010A9E662_J890011VH53JT
           
         toolbox:
           enabled: true
