@@ -1,0 +1,65 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: immich
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: immich
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: immich
+    repoURL: ghcr.io/immich-app/immich-charts
+    targetRevision: 0.9.3
+    helm:
+      releaseName: immich
+      valuesObject:
+        image:
+          tag: v1.132.3
+        immich:
+          persistence:
+            library:
+              existingClaim: immich-nfs-library-pvc
+          configuration:
+            storageTemplate:
+              enabled: true
+              template: "{{y}}/{{MM}}/{{y}}-{{MM}}-{{dd}}_{{filename}}"
+        server:
+          ingress:
+            main:
+              enabled: true
+              annotations:
+                nginx.ingress.kubernetes.io/proxy-body-size: "0"
+                cert-manager.io/cluster-issuer: "letsencrypt-prod"
+              ingressClassName: nginx
+              tls:
+                - secretName: immich-tls
+                  hosts:
+                    - immich.boiss.it
+              hosts:
+                - host: immich.boiss.it
+                  paths:
+                    - path: "/"
+        redis:
+          enabled: true
+        env:
+          DB_HOSTNAME: immich-postgres-rw
+          DB_DATABASE_NAME: immich
+          DB_USERNAME:
+            valueFrom:
+              secretKeyRef:
+                name: immich-postgres-user
+                key: username
+          DB_PASSWORD:
+            valueFrom:
+              secretKeyRef:
+                name: immich-postgres-user
+                key: password
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

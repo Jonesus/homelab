@@ -6,3 +6,5 @@ resources:
   - homeassistant-proxy/app.yaml
   - holvi-proxy/app.yaml
   - calibre/app.yaml
+  - immich/app.yaml
+  - immich/prerequisites.yaml
