@@ -43,9 +43,8 @@ spec:
                 - host: immich.boiss.it
                   paths:
                     - path: "/"
-        redis:
-          enabled: true
         env:
+          REDIS_HOSTNAME: redis.redis
           DB_HOSTNAME: immich-postgres-rw
           DB_DATABASE_NAME: immich
           DB_USERNAME:
