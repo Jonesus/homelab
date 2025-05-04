@@ -19,6 +19,7 @@ spec:
       valuesObject:
         image:
           tag: v1.132.3
+
         immich:
           persistence:
             library:
@@ -27,6 +28,7 @@ spec:
             storageTemplate:
               enabled: true
               template: "{{y}}/{{MM}}/{{y}}-{{MM}}-{{dd}}_{{filename}}"
+
         server:
           ingress:
             main:
@@ -39,10 +41,17 @@ spec:
                 - secretName: immich-tls
                   hosts:
                     - immich.boiss.it
+                - secretName: kuvat-palosuo-tls
+                  hosts:
+                    - kuvat.palosuo.fi
               hosts:
                 - host: immich.boiss.it
                   paths:
                     - path: "/"
+                - host: kuvat.palosuo.fi
+                  paths:
+                    - path: "/"
+
         env:
           REDIS_HOSTNAME: redis.redis
           DB_HOSTNAME: immich-postgres-rw
