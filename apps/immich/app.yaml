@@ -51,6 +51,32 @@ spec:
                 - host: kuvat.palosuo.fi
                   paths:
                     - path: "/"
+          podLabels:
+            app: immich-bursty
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                    - immich-bursty
+                topologyKey: "kubernetes.io/hostname"
+
+        machine-learning:
+          podLabels:
+            app: immich-bursty
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                    - immich-bursty
+                topologyKey: "kubernetes.io/hostname"
 
         env:
           REDIS_HOSTNAME: redis.redis
