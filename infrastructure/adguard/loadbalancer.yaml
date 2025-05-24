@@ -4,6 +4,7 @@ metadata:
   name: adguard-loadbalancer
   namespace: adguard
 spec:
+  externalTrafficPolicy: Local
   selector:
     app: adguard
   ports:
