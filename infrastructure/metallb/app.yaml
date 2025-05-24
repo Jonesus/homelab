@@ -16,6 +16,9 @@ spec:
     targetRevision: 0.14.9
     helm:
       releaseName: metallb
+      valuesObject:
+        speaker:
+          ignoreExcludeLB: true
   syncPolicy:
     automated:
       prune: true
