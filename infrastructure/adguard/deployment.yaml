@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adguard
+  namespace: adguard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: adguard
+  template:
+    metadata:
+      labels:
+        app: adguard
+    spec:
+      containers:
+        - name: adguard-home
+          image: adguard/adguardhome:latest
+          volumeMounts:
+            - name: adguard-data
+              mountPath: /opt/adguardhome/work
+              subPath: work
+            - name: adguard-data
+              mountPath: /opt/adguardhome/conf
+              subPath: config
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+      volumes:
+        - name: adguard-data
+          persistentVolumeClaim:
+            claimName: adguard-nas-config-pvc
