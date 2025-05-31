@@ -9,3 +9,4 @@ resources:
   - redis/app.yaml
   - immich/app.yaml
   - immich/prerequisites.yaml
+  - vaultwarden/app.yaml

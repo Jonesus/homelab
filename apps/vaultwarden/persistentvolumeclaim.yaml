@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nas-vaultwarden-pvc
+  namespace: vaultwarden
+spec:
+  storageClassName: ""
+  volumeName: nas-vaultwarden-pv
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
