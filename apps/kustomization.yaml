@@ -12,3 +12,4 @@ resources:
   - vaultwarden/app.yaml
   - zigbee2mqtt/prerequisites.yaml
   - zigbee2mqtt/app.yaml
+  - mosquitto/app.yaml
