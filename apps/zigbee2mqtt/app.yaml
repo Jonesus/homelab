@@ -29,6 +29,7 @@ spec:
             transmit_power: 20
           mqtt:
             server: "mqtt://mosquitto:8883"
+            version: 5
 
         statefulset:
           storage:
