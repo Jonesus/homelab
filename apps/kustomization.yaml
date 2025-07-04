@@ -10,3 +10,5 @@ resources:
   - immich/app.yaml
   - immich/prerequisites.yaml
   - vaultwarden/app.yaml
+  - zigbee2mqtt/prerequisites.yaml
+  - zigbee2mqtt/app.yaml

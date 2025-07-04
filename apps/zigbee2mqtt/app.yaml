@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zigbee2mqtt
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: homeassistant
+    server: https://kubernetes.default.svc
+  project: apps
+  source:
+    chart: zigbee2mqtt
+    repoURL: https://charts.zigbee2mqtt.io
+    targetRevision: 2.4.0
+    helm:
+      releaseName: zigbee2mqtt
+      valuesObject:
+        zigbee2mqtt:
+          serial:
+            adapter: zstack
+            port: tcp://192.168.1.105:6638
+            baudrate: 115200
+            disable_led: false
+          advanced:
+            transmit_power: 20
+          mqtt:
+            server: "mqtt://mosquitto:8883"
+
+        statefulset:
+          storage:
+            existingVolume: nas-zigbee2mqtt-pv
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 1Gi
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: privileged
+        pod-security.kubernetes.io/audit: privileged
+        pod-security.kubernetes.io/warn: privileged
+

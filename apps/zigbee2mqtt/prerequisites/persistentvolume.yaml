@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nas-zigbee2mqtt-pv
+  namespace: homeassistant
+spec:
+  accessModes:
+    - ReadWriteOnce
+  iscsi:
+    targetPortal: 192.168.1.103:3260
+    iqn: iqn.2004-04.com.qnap:ts-469pro:iscsi.zigbee2mqtt.d3a579
+    lun: 0
+    fsType: ext4
+    readOnly: false
+  capacity:
+    storage: 2Gi
