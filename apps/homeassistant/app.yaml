@@ -1,0 +1,60 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homeassistant
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: homeassistant
+    server: https://kubernetes.default.svc
+  project: apps
+  source:
+    chart: home-assistant
+    repoURL: http://pajikos.github.io/home-assistant-helm-chart/
+    targetRevision: 0.3.9
+    helm:
+      releaseName: home-assistant
+      valuesObject:
+        ingress:
+          enabled: true
+          className: "nginx"
+          annotations:
+            cert-manager.io/cluster-issuer: "letsencrypt-prod"
+            nginx.ingress.kubernetes.io/proxy-body-size: 100m
+          tls:
+            - secretName: homeassistant-cluster-tls
+              hosts:
+                - hass.boiss.it
+          hosts:
+            - host: hass.boiss.it
+              paths:
+                - path: /
+                  pathType: ImplementationSpecific
+
+        configuration:
+          enabled: true
+          forceInit: true
+        
+        addons:
+          codeserver:
+            enabled: true
+
+        persistence:
+          enabled: true
+          size: 10Gi
+          existingVolume: nas-homeassistant-pv
+
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 1Gi
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

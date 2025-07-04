@@ -13,3 +13,5 @@ resources:
   - zigbee2mqtt/prerequisites.yaml
   - zigbee2mqtt/app.yaml
   - mosquitto/app.yaml
+  - homeassistant/app.yaml
+  - homeassistant/prerequisites.yaml
