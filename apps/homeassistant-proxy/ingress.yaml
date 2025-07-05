@@ -10,9 +10,9 @@ spec:
   tls:
     - secretName: homeassistant-tls
       hosts:
-        - hassio.boiss.it
+        - hassold.boiss.it
   rules:
-    - host: hassio.boiss.it
+    - host: hassold.boiss.it
       http:
         paths:
           - path: /

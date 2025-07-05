@@ -26,9 +26,9 @@ spec:
           tls:
             - secretName: homeassistant-cluster-tls
               hosts:
-                - hass.boiss.it
+                - hassio.boiss.it
           hosts:
-            - host: hass.boiss.it
+            - host: hassio.boiss.it
               paths:
                 - path: /
                   pathType: ImplementationSpecific
