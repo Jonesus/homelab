@@ -10,10 +10,6 @@ metadata:
     nginx.ingress.kubernetes.io/service-upstream: "true"
 spec:
   ingressClassName: nginx
-  tls:
-    - secretName: argocd-tls
-      hosts:
-        - argo.home
   rules:
     - host: argo.home
       http:
