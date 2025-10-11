@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: miniflux-ingress
+  namespace: miniflux
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: miniflux-tls
+      hosts:
+        - rss.boiss.it
+  rules:
+    - host: rss.boiss.it
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: miniflux
+                port:
+                  name: http

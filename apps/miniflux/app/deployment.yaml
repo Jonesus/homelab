@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: miniflux
+  namespace: miniflux
+  labels:
+    app: miniflux
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: miniflux
+  template:
+    metadata:
+      labels:
+        app: miniflux
+    spec:
+      containers:
+        - name: miniflux
+          image: miniflux/miniflux:2.2.13
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:8080"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: miniflux-postgres-user
+                  key: DATABASE_URL
+            - name: RUN_MIGRATIONS
+              value: "1"
+            - name: CREATE_ADMIN
+              value: "1"
+            - name: ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: miniflux-postgres-user
+                  key: username
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: miniflux-postgres-user
+                  key: password
+            - name: TZ
+              value: "Europe/Helsinki"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /liveness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 2
+            failureThreshold: 3
+      restartPolicy: Always

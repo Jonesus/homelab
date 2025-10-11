@@ -1,0 +1,38 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: miniflux-postgres
+  namespace: miniflux
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.5
+  instances: 1
+
+  postgresql:
+    enableAlterSystem: true
+
+  managed:
+    roles:
+      - name: miniflux
+        superuser: false
+        login: true
+
+  bootstrap:
+    initdb:
+      database: miniflux
+      owner: miniflux
+      secret:
+        name: miniflux-postgres-user
+      postInitSQL:
+        - CREATE DATABASE miniflux OWNER miniflux;
+        - ALTER DATABASE miniflux SET search_path TO public;
+        - GRANT ALL PRIVILEGES ON DATABASE miniflux TO miniflux;
+
+  storage:
+    pvcTemplate:
+      storageClassName: ""
+      volumeName: nas-postgres-pv-miniflux
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 2Gi

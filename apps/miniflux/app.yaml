@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: miniflux
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argoproj.io
+spec:
+  destination:
+    namespace: miniflux
+    server: https://kubernetes.default.svc
+  project: apps
+  source:
+    path: apps/miniflux/app
+    repoURL: https://github.com/jonesus/homelab
+    targetRevision: HEAD
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
