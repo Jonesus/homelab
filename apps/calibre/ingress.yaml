@@ -6,6 +6,9 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/proxy-body-size: 50m
+    nginx.ingress.kubernetes.io/proxy-busy-buffers-size: 1024k
+    nginx.ingress.kubernetes.io/proxy-buffers: 4 512k
+    nginx.ingress.kubernetes.io/proxy-buffer-size: 1024k
 spec:
   ingressClassName: nginx
   tls:
