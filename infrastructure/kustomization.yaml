@@ -16,3 +16,4 @@ resources:
   - intel-device-plugin/app.yaml
   - cloudnative-pg/app.yaml
   - adguard/app.yaml
+  - snapshot-controller/app.yaml
