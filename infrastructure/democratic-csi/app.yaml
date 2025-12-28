@@ -1,0 +1,71 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: democratic-csi
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: democratic-csi
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: democratic-csi
+    repoURL: https://democratic-csi.github.io/charts/
+    targetRevision: 0.15.0
+    helm:
+      releaseName: democratic-csi
+      valuesObject:
+        csiDriver:
+          name: "iscsi"
+        controller:
+          driver:
+            enabled: true
+            image:
+              registry: docker.io/democraticcsi/democratic-csi
+              tag: next
+        node:
+          hostPID: true
+          driver:
+            extraEnv:
+              - name: ISCSIADM_HOST_STRATEGY
+                value: nsenter
+              - name: ISCSIADM_HOST_PATH
+                value: /usr/local/sbin/iscsiadm
+            iscsiDirHostPath: /var/iscsi
+            iscsiDirHostPathType: ""
+        storageClasses:
+        - name: iscsi
+          defaultClass: false
+          reclaimPolicy: Delete
+          volumeBindingMode: Immediate
+          allowVolumeExpansion: true
+          parameters:
+            fsType: ext4
+            detachedVolumesFromSnapshots: "false"
+          mountOptions: []
+          secrets:
+            provisioner-secret:
+            controller-publish-secret:
+            node-stage-secret:
+            node-publish-secret:
+            controller-expand-secret:
+        volumeSnapshotClasses:
+        - name: iscsi
+          parameters:
+            detachedSnapshots: "true"
+        driver:
+          existingConfigSecret: iscsi-config
+          config:
+            driver: freenas-api-iscsi
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: privileged
+        pod-security.kubernetes.io/audit: privileged
+        pod-security.kubernetes.io/warn: privileged
