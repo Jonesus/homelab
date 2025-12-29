@@ -13,12 +13,30 @@ spec:
   source:
     chart: immich
     repoURL: ghcr.io/immich-app/immich-charts
-    targetRevision: 0.9.3
+    targetRevision: 0.10.3
     helm:
       releaseName: immich
       valuesObject:
-        image:
-          tag: v1.132.3
+        controllers:
+          main:
+            containers:
+              main:
+                image:
+                  tag: v2.4.1
+                env:
+                  REDIS_HOSTNAME: redis.redis
+                  DB_HOSTNAME: immich-postgres-rw
+                  DB_DATABASE_NAME: immich
+                  DB_USERNAME:
+                    valueFrom:
+                      secretKeyRef:
+                        name: immich-postgres-user
+                        key: username
+                  DB_PASSWORD:
+                    valueFrom:
+                      secretKeyRef:
+                        name: immich-postgres-user
+                        key: password
 
         immich:
           persistence:
@@ -28,6 +46,9 @@ spec:
             storageTemplate:
               enabled: true
               template: "{{y}}/{{MM}}/{{y}}-{{MM}}-{{dd}}_{{filename}}"
+            machineLearning:
+              facialRecognition:
+                maxDistance: 0.4
 
         server:
           ingress:
@@ -36,7 +57,7 @@ spec:
               annotations:
                 nginx.ingress.kubernetes.io/proxy-body-size: "0"
                 cert-manager.io/cluster-issuer: "letsencrypt-prod"
-              ingressClassName: nginx
+              className: nginx
               tls:
                 - secretName: immich-tls
                   hosts:
@@ -78,20 +99,6 @@ spec:
                     - immich-bursty
                 topologyKey: "kubernetes.io/hostname"
 
-        env:
-          REDIS_HOSTNAME: redis.redis
-          DB_HOSTNAME: immich-postgres-rw
-          DB_DATABASE_NAME: immich
-          DB_USERNAME:
-            valueFrom:
-              secretKeyRef:
-                name: immich-postgres-user
-                key: username
-          DB_PASSWORD:
-            valueFrom:
-              secretKeyRef:
-                name: immich-postgres-user
-                key: password
   syncPolicy:
     automated:
       prune: true

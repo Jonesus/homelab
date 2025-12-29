@@ -4,6 +4,5 @@ kind: Kustomization
 resources:
   - database.yaml
   - database-user.sealed.yaml
-  - postgres-pv.yaml
   - library-pv.yaml
   - library-pvc.yaml
