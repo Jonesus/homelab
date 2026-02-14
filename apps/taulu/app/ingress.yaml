@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: taulu-ingress
+  namespace: taulu
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: taulu-tls
+      hosts:
+        - taulu.boiss.it
+  rules:
+    - host: taulu.boiss.it
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: taulu
+                port:
+                  name: http

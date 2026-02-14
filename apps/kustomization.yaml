@@ -16,3 +16,5 @@ resources:
   - homeassistant/prerequisites.yaml
   - miniflux/app.yaml
   - miniflux/prerequisites.yaml
+  - taulu/app.yaml
+  - taulu/prerequisites.yaml

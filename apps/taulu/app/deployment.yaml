@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: taulu
+  namespace: taulu
+  labels:
+    app: taulu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: taulu
+  template:
+    metadata:
+      labels:
+        app: taulu
+    spec:
+      containers:
+        - image: ghcr.io/jonesus/taulu-api:latest
+          name: taulu
+          envFrom:
+            - secretRef:
+                name: taulu-api-secrets
+          resources:
+            requests:
+              cpu: 10m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      restartPolicy: Always
