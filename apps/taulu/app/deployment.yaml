@@ -16,7 +16,7 @@ spec:
         app: taulu
     spec:
       containers:
-        - image: ghcr.io/jonesus/taulu-api:sha-d94c0a8 
+        - image: ghcr.io/jonesus/taulu-api:sha-438d95b
           name: taulu
           envFrom:
             - secretRef:
