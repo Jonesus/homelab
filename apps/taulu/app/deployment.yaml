@@ -16,11 +16,14 @@ spec:
         app: taulu
     spec:
       containers:
-        - image: ghcr.io/jonesus/taulu-api:sha-438d95b
+        - image: ghcr.io/jonesus/taulu-api:sha-454f09f
           name: taulu
           envFrom:
             - secretRef:
                 name: taulu-api-secrets
+          env:
+            - name: SLEEP_MINUTES
+              value: "5"
           resources:
             requests:
               cpu: 10m
