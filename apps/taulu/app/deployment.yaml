@@ -22,8 +22,8 @@ spec:
             - secretRef:
                 name: taulu-api-secrets
           env:
-            - name: SLEEP_MINUTES
-              value: "60"
+            - name: REFRESH_HOUR
+              value: "1"
           resources:
             requests:
               cpu: 10m
