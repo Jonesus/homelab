@@ -23,7 +23,7 @@ spec:
                 name: taulu-api-secrets
           env:
             - name: SLEEP_MINUTES
-              value: "5"
+              value: "60"
           resources:
             requests:
               cpu: 10m
