@@ -28,7 +28,7 @@ spec:
         pod-security.kubernetes.io/warn: privileged
   ignoreDifferences:
     - group: "*"
-      kind: Application
+      kind: "*"
       namespace: "*"
       jsonPointers:
         - /metadata/finalizers
