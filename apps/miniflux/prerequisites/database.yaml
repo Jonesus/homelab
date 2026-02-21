@@ -29,8 +29,7 @@ spec:
 
   storage:
     pvcTemplate:
-      storageClassName: ""
-      volumeName: nas-postgres-pv-miniflux
+      storageClassName: iscsi
       accessModes:
         - ReadWriteOnce
       resources:
