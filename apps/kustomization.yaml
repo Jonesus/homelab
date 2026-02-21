@@ -13,7 +13,6 @@ resources:
   - zigbee2mqtt/app.yaml
   - mosquitto/app.yaml
   - homeassistant/app.yaml
-  - homeassistant/prerequisites.yaml
   - miniflux/app.yaml
   - miniflux/prerequisites.yaml
   - taulu/app.yaml
