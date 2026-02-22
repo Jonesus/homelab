@@ -43,4 +43,11 @@ spec:
               port: 3000
             initialDelaySeconds: 5
             periodSeconds: 10
+          volumeMounts:
+            - name: state
+              mountPath: /app/state
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: taulu-state-pvc
       restartPolicy: Always
