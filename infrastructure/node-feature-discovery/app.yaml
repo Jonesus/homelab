@@ -29,6 +29,5 @@ spec:
   ignoreDifferences:
     - group: "*"
       kind: "*"
-      namespace: "*"
       jsonPointers:
         - /metadata/finalizers
