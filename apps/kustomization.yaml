@@ -15,5 +15,7 @@ resources:
   - homeassistant/app.yaml
   - miniflux/app.yaml
   - miniflux/prerequisites.yaml
+  - paperless/app.yaml
+  - paperless/prerequisites.yaml
   - taulu/app.yaml
   - taulu/prerequisites.yaml

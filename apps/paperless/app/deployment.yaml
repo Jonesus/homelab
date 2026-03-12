@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paperless
+  namespace: paperless
+  labels:
+    app: paperless
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paperless
+  template:
+    metadata:
+      labels:
+        app: paperless
+    spec:
+      containers:
+        - name: paperless
+          image: ghcr.io/paperless-ngx/paperless-ngx:2.20.10
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: PAPERLESS_DBURL
+              valueFrom:
+                secretKeyRef:
+                  name: paperless-postgres-user
+                  key: PAPERLESS_DBURL
+            - name: PAPERLESS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: paperless-postgres-user
+                  key: PAPERLESS_SECRET_KEY
+            - name: PAPERLESS_REDIS
+              value: "redis://redis.redis:6379"
+            - name: PAPERLESS_URL
+              value: "https://paperless.boiss.it"
+            - name: PAPERLESS_TIME_ZONE
+              value: "Europe/Helsinki"
+            - name: PAPERLESS_PORT
+              value: "8000"
+            - name: PAPERLESS_OCR_USER_ARGS
+              value: "'{\"continue_on_soft_render_error\": true}'"
+          volumeMounts:
+            - name: media
+              mountPath: /usr/src/paperless/media
+              subPath: media
+            - name: media
+              mountPath: /usr/src/paperless/data
+              subPath: data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: nfs-paperless-pvc
+      restartPolicy: Always
