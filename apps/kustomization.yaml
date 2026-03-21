@@ -19,3 +19,4 @@ resources:
   - paperless/prerequisites.yaml
   - taulu/app.yaml
   - taulu/prerequisites.yaml
+  - backup-photos/app.yaml

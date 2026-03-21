@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup-photos
+  namespace: immich
+spec:
+  schedule: "0 3 * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 43200
+      template:
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rsync
+              image: instrumentisto/rsync-ssh:alpine
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+              command:
+                - sh
+                - -c
+                - |
+                  echo "=== Backup started at $(date -Iseconds) ==="
+                  rsync -avh --stats /source/ /destination/
+                  EXIT_CODE=$?
+                  echo "=== Backup finished at $(date -Iseconds) with exit code $EXIT_CODE ==="
+                  exit $EXIT_CODE
+              volumeMounts:
+                - name: source
+                  mountPath: /source
+                  readOnly: true
+                - name: destination
+                  mountPath: /destination
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: "1"
+                  memory: 512Mi
+          restartPolicy: OnFailure
+          volumes:
+            - name: source
+              persistentVolumeClaim:
+                claimName: backup-photos-source-pvc
+                readOnly: true
+            - name: destination
+              persistentVolumeClaim:
+                claimName: backup-photos-dest-pvc
