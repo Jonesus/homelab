@@ -33,7 +33,8 @@ spec:
 
         statefulset:
           storage:
-            existingVolume: nas-zigbee2mqtt-pv
+            enabled: true
+            storageClassName: iscsi
         resources:
           requests:
             cpu: 200m
