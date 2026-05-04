@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: matter-server
+spec:
+  replicas: 1
+  strategy:
+    # Old pod must release the iscsi PVC and the host port before the new one
+    # binds. Recreate avoids a brief window where two pods would compete for
+    # both the RWO volume and host port 5580.
+    type: Recreate
+  selector:
+    matchLabels:
+      app: matter-server
+  template:
+    metadata:
+      labels:
+        app: matter-server
+    spec:
+      # Required for Matter/mDNS — IPv6 link-local multicast (FF02::FB) used to
+      # discover the Aqara M100 Thread Border Router and Matter devices on the
+      # LAN does not traverse the CNI overlay.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: matter-server
+          image: ghcr.io/home-assistant-libs/python-matter-server:stable
+          args:
+            - --storage-path
+            - /data
+            - --paa-root-cert-dir
+            - /data/credentials
+          ports:
+            - name: ws
+              containerPort: 5580
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1
+              memory: 1Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: matter-server-data

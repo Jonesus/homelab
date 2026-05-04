@@ -11,6 +11,7 @@ resources:
   - vaultwarden/app.yaml
   - zigbee2mqtt/app.yaml
   - mosquitto/app.yaml
+  - matter-server/app.yaml
   - homeassistant/app.yaml
   - miniflux/app.yaml
   - miniflux/prerequisites.yaml
