@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: immich-ingress-internal
+  namespace: immich
+  annotations:
+    cert-manager.io/cluster-issuer: "internal-ca"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: immich-internal-tls
+      hosts:
+        - immich.internal
+  rules:
+    - host: immich.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: immich-server
+                port:
+                  number: 2283

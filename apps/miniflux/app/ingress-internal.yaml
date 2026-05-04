@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: miniflux-ingress-internal
+  namespace: miniflux
+  annotations:
+    cert-manager.io/cluster-issuer: "internal-ca"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: miniflux-internal-tls
+      hosts:
+        - rss.internal
+  rules:
+    - host: rss.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: miniflux
+                port:
+                  name: http

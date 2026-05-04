@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: taulu-ingress-internal
+  namespace: taulu
+  annotations:
+    cert-manager.io/cluster-issuer: "internal-ca"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: taulu-internal-tls
+      hosts:
+        - taulu.internal
+  rules:
+    - host: taulu.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: taulu
+                port:
+                  name: http

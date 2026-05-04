@@ -6,3 +6,5 @@ namespace: cert-manager
 resources:
   - clusterissuer-staging.yaml
   - clusterissuer-prod.yaml
+  - clusterissuer-selfsigned.yaml
+  - clusterissuer-internal-ca.yaml

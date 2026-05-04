@@ -3,13 +3,20 @@ kind: Service
 metadata:
   name: adguard-loadbalancer
   namespace: adguard
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: 192.168.1.209
 spec:
   externalTrafficPolicy: Local
+  loadBalancerIP: 192.168.1.209
   selector:
     app: adguard
   ports:
     - protocol: UDP
       port: 53
       targetPort: 53
-      name: dns
+      name: dns-udp
+    - protocol: TCP
+      port: 53
+      targetPort: 53
+      name: dns-tcp
   type: LoadBalancer

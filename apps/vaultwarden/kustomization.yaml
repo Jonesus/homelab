@@ -7,4 +7,5 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml
+  - ingress-internal.yaml
   - admin-token.sealed.yaml

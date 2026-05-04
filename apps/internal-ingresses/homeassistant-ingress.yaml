@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: homeassistant-ingress-internal
+  namespace: homeassistant
+  annotations:
+    cert-manager.io/cluster-issuer: "internal-ca"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: 100m
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: homeassistant-internal-tls
+      hosts:
+        - hass.internal
+  rules:
+    - host: hass.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: home-assistant
+                port:
+                  number: 8080

@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: calibre-ingress-internal
+  namespace: calibre
+  annotations:
+    cert-manager.io/cluster-issuer: "internal-ca"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+    nginx.ingress.kubernetes.io/proxy-busy-buffers-size: 1024k
+    nginx.ingress.kubernetes.io/proxy-buffers: 4 512k
+    nginx.ingress.kubernetes.io/proxy-buffer-size: 1024k
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: calibre-internal-tls
+      hosts:
+        - calibre.internal
+  rules:
+    - host: calibre.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: calibre
+                port:
+                  name: http

@@ -20,3 +20,4 @@ resources:
   - taulu/app.yaml
   - taulu/prerequisites.yaml
   - backup-photos/app.yaml
+  - internal-ingresses/app.yaml

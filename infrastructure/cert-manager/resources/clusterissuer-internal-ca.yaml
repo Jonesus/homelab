@@ -1,0 +1,33 @@
+---
+# Root CA for *.internal — signed by selfsigned-bootstrap once, then used to
+# issue per-service certs for LAN-only hostnames where Let's Encrypt cannot.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: internal-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: homelab-internal-ca
+  subject:
+    organizations:
+      - homelab
+  secretName: internal-ca-tls
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  duration: 87600h0m0s    # 10 years
+  renewBefore: 720h0m0s   # 30 days
+  issuerRef:
+    name: selfsigned-bootstrap
+    kind: ClusterIssuer
+---
+# Cluster-wide issuer that signs *.internal certs with the root above.
+# Reference from Ingress with: cert-manager.io/cluster-issuer: "internal-ca"
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: internal-ca
+spec:
+  ca:
+    secretName: internal-ca-tls

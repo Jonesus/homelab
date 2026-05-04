@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: internal-ingresses
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    server: https://kubernetes.default.svc
+  project: apps
+  source:
+    path: apps/internal-ingresses
+    repoURL: https://github.com/jonesus/homelab
+    targetRevision: HEAD
+  syncPolicy:
+    automated:
+      prune: true

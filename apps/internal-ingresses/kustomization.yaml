@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# *.internal Ingress objects for apps whose primary Ingress is rendered by a
+# Helm chart (so we cannot just drop a sibling YAML next to it).  Each Ingress
+# here points at the in-cluster Service the chart already creates and uses the
+# internal-ca ClusterIssuer for TLS.
+
+resources:
+  - homeassistant-ingress.yaml
+  - immich-ingress.yaml
