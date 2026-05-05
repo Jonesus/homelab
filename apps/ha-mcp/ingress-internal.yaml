@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ha-mcp-ingress-internal
+  namespace: homeassistant
+  annotations:
+    cert-manager.io/cluster-issuer: "internal-ca"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: ha-mcp-internal-tls
+      hosts:
+        - ha-mcp.internal
+  rules:
+    - host: ha-mcp.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ha-mcp
+                port:
+                  name: http

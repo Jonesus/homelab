@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ha-mcp
+  namespace: homeassistant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ha-mcp
+  template:
+    metadata:
+      labels:
+        app: ha-mcp
+    spec:
+      containers:
+        - name: ha-mcp
+          image: ghcr.io/homeassistant-ai/ha-mcp:7.3.0
+          command: ["fastmcp", "run", "fastmcp-http.json"]
+          ports:
+            - name: http
+              containerPort: 8086
+          env:
+            - name: HOMEASSISTANT_URL
+              value: http://home-assistant.homeassistant.svc.cluster.local:8080
+            - name: HOMEASSISTANT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ha-mcp-token
+                  key: token
+            - name: HAMCP_ENABLE_FILESYSTEM_TOOLS
+              value: "true"
+            - name: ENABLE_YAML_CONFIG_EDITING
+              value: "true"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

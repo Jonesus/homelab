@@ -13,6 +13,7 @@ resources:
   - mosquitto/app.yaml
   - matter-server/app.yaml
   - homeassistant/app.yaml
+  - ha-mcp/app.yaml
   - miniflux/app.yaml
   - miniflux/prerequisites.yaml
   - paperless/app.yaml

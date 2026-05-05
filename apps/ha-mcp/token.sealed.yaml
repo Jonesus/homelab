@@ -1,0 +1,14 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: ha-mcp-token
+  namespace: homeassistant
+spec:
+  encryptedData:
+    token: AgDRZpWjmkQE0Zu9A3KRLi3+MVOfl/HNSSkaZE1RL/577xLmPUYryNM/lktVNXP6csNQ6wYoswHjuaDN/OAoUlUZ7Gzqxw0YM/iuWy19LX+xKmTOPxRqz0yZvwhgN1vbg2DMAq52WaImwUHuui0kxTclFTdqE7RDT24lOeHmogYVXELl1IajH8cDXuK6D/+6DDFXB9nndDZdTq7BRLpWFzYxc+hxHEQ7tGwfaG4xqVmU723NZbT5Ugz4HYou2RFIacv/EDDVJOahZl0U7qT/WrfntA0uZ0YuPrfhlmFZgwXK87N5+4BfovSu6cFiWPWv5cEVXLEX/u92MyGcLbEynfH9rFLQigigOG6sU38Jtsx7VYsGP0YE7WALPZJHP3ryGiPscUvDz1N+xCoMyv0NjSIgBuc3bZWlwkwM5bnup0HQ5Q6B30S1BS0Nk7rgBeruFdXNL6XebXC29unNXYeia6etP9bgyEU9oenEPtNzNi+YOJ45o/JKLaPw3BFcQ4q1NN79RqPBUW/2m5v9wUyc4dhzmAoK+BlZxQJGYVyWhhhtOQyg1HpjoS+vKeRWYzMtYvxavUiUiJUYt1l1Atr/PHt4AU+SyqjA0L+J58/VFmH2v0MESbA4UZen0bYRnufmeNKia6Dh4gZBXeI5o2yWSnHRYG6VjVyLFwHitllpnn8YggS487uIXs5wYyAckReD7283ovbRrpHXFn25Am2jxVnWJMvtr7thAglJyGxHSKaYRu8juNYknWSzt1K3lcJ8v+efqjJ1wU5NH2d2nDloVCn0GScoG29s1Dp/UK+WzDC0VsUOvKXY618LFcpdL8En9tG8uuHVE2ZMjrZm/+8w6m3/QB4b46nqzZYVDIC8u6rBOnkvZSi7gWsrJa972wofNrwLV1CwpO8YureArB7lk07ovCqvysigNDc72sBcod3zm31zoWnojcw=
+  template:
+    metadata:
+      name: ha-mcp-token
+      namespace: homeassistant
+    type: Opaque
