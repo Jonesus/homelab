@@ -26,7 +26,10 @@ Service in cluster
 DNS resolution: AdGuard runs in the cluster on a pinned MetalLB IP
 (`192.168.1.209`). MikroTik DHCP advertises that IP as the primary resolver
 and the router (`192.168.1.1`) as a fallback so a cluster outage does not kill
-LAN DNS.
+LAN DNS. The router also carries a mirror of the `*.internal` wildcard (see
+`homenet/mikrotik/dns.tf`) so that clients which sticky-switch to the fallback
+resolver — systemd-resolved does this readily — still get answers for
+`.internal` hostnames instead of NXDOMAIN.
 
 TLS: each `.internal` Ingress sets `nginx.ingress.kubernetes.io/ssl-redirect:
 "false"` so plain HTTP works without a redirect. HTTPS is also served — every
@@ -48,6 +51,10 @@ kubectl apply -k public/apps/internal-ingresses
 ```
 
 ### 2. Add the `*.internal` wildcard rewrite in AdGuard
+
+> The router carries the same wildcard via `homenet/mikrotik/dns.tf` (applied
+> in step 3 below), so the mapping ends up in two places. Keep them in sync
+> if the ingress LB IP ever moves.
 
 AdGuard's config is stored on a PVC and managed via the admin UI, so this is
 not in code:
