@@ -17,6 +17,9 @@ spec:
     helm:
       releaseName: home-assistant
       valuesObject:
+        image:
+          tag: "2026.4.4"
+
         ingress:
           enabled: true
           className: "nginx"
