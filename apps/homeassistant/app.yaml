@@ -43,7 +43,11 @@ spec:
         configuration:
           enabled: true
           forceInit: true
-        
+
+        podSecurityContext:
+          fsGroup: 1000
+          fsGroupChangePolicy: OnRootMismatch
+
         addons:
           codeserver:
             enabled: true
