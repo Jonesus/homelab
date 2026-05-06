@@ -8,4 +8,5 @@ kind: Kustomization
 
 resources:
   - homeassistant-ingress.yaml
+  - homeassistant-codeserver-ingress.yaml
   - immich-ingress.yaml
