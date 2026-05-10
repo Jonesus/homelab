@@ -76,6 +76,14 @@ const COURSES = {
 const TEMPERATURES = [0, 10, 20, 30, 40, 50, 60, 95];
 const SPINS = [undefined, 0, 400, 500, 700, 800, 900, 1000, 1100, 1200, 1400];
 const DOSES = ['Off', 'Low', 'Medium', 'High'];
+const DRY_MODES = {
+    0x2: 'Auto',
+    0x3: '30 min',
+    0x4: '60 min',
+    0x6: '120 min',
+    0xa: 'Iron Dry',
+    0xb: 'Sensor Dry',
+};
 export default class Device extends AABBDevice {
     constructor(HA, thinq, meta) {
         super(HA, thinq);
@@ -237,6 +245,15 @@ export default class Device extends AABBDevice {
                     name: 'Wash + Dry',
                     icon: 'mdi:tumble-dryer',
                 },
+                dry_mode: {
+                    platform: 'sensor',
+                    unique_id: '$deviceid-dry-mode',
+                    state_topic: '$this/dry_mode',
+                    name: 'Dry mode',
+                    icon: 'mdi:tumble-dryer',
+                    device_class: 'enum',
+                    options: ['Off', ...Object.values(DRY_MODES)],
+                },
                 remote_start: {
                     platform: 'binary_sensor',
                     unique_id: '$deviceid-remote-start',
@@ -276,6 +293,7 @@ export default class Device extends AABBDevice {
             const flags1 = buf[57]; // option bitfield 1
             const flags2 = buf[58]; // option bitfield 2
             const dryRequested = buf[54] >= 2;
+            const dryMode = DRY_MODES[buf[54]] ?? 'Off';
             const extraRinse = buf[53] >= 2;
             const delayEnd = buf[55]; // hours, 0 = off (range 3..19 when set)
             const detergent = buf[73]; // 0=Off, 1=Low, 2=Medium, 3=High
@@ -299,6 +317,7 @@ export default class Device extends AABBDevice {
             this.publishProperty('steam', flags1 & 0x80 ? 'ON' : 'OFF');
             this.publishProperty('extra_rinse', extraRinse ? 'ON' : 'OFF');
             this.publishProperty('dry', dryRequested ? 'ON' : 'OFF');
+            this.publishProperty('dry_mode', dryMode);
             this.publishProperty('remote_start', flags2 & 0x02 ? 'ON' : 'OFF');
             this.publishProperty('child_lock', flags2 & 0x80 ? 'ON' : 'OFF');
         }
