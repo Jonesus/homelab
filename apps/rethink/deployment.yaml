@@ -17,7 +17,9 @@ spec:
     spec:
       containers:
         - name: rethink
-          image: ghcr.io/anszom/rethink:latest
+          # ghcr.io/anszom/rethink has only a `:dev` tag — no `:latest` is
+          # published (no stable release has been cut as of 2026-05).
+          image: ghcr.io/anszom/rethink:dev
           ports:
             - containerPort: 4433
               name: thinq2-https
