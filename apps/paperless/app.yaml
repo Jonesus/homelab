@@ -4,7 +4,7 @@ metadata:
   name: paperless
   namespace: argocd
   finalizers:
-    - resources-finalizer.argoproj.io
+    - resources-finalizer.argocd.argoproj.io
 spec:
   destination:
     namespace: paperless
