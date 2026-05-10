@@ -25,6 +25,12 @@ spec:
     - name: thinq1-tls
       port: 47878
       targetPort: 47878
+    # Appliance MQTTS endpoint (rethink-cloud bridges from here to the HA
+    # broker). /route tells the appliance to use ssl://rethink.lan:8884 — if
+    # this isn't exposed, the appliance can't open its persistent session.
+    - name: thinq2-mqtts
+      port: 8884
+      targetPort: 8884
     - name: management
       port: 44401
       targetPort: 44401
