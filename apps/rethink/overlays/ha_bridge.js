@@ -20,7 +20,7 @@ const t2deviceTypes = {
     ['Y_V8_Y___W.B32QEUK']: Y_V8_Y___W_B32QEUK,
     ['F_V8_Y___W.B_2QEUK']: F_V8_Y___W_B_2QEUK,
     ['F_V__Y___W.B_2QEUK']: F_V8_Y___W_B_2QEUK, // NOTE: we reuse F_V8_Y___W_B_2QEUK as the models appear to be compatible
-    ['F_VB_F___W.B_2QEUK']: F_V8_Y___W_B_2QEUK, // LG CV74J7S2QA washer/dryer combo (10.5/7kg) — same B_2QEUK family
+    ['F_VB_F___W.B_2QEUK']: F_V8_Y___W_B_2QEUK, // LG CV74J7S2QA washer/dryer combo (10.5/7 kg) — same B_2QEUK family
 };
 class Bridge {
     constructor(HA) {

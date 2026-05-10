@@ -17,5 +17,6 @@ configMapGenerator:
   - name: rethink-ha-bridge
     files:
       - overlays/ha_bridge.js
+      - overlays/F_V8_Y___W.B_2QEUK.js
 generatorOptions:
   disableNameSuffixHash: true
