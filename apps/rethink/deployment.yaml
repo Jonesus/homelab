@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rethink
+  namespace: homeassistant
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: rethink
+  template:
+    metadata:
+      labels:
+        app: rethink
+    spec:
+      containers:
+        - name: rethink
+          image: ghcr.io/anszom/rethink:latest
+          ports:
+            - containerPort: 4433
+              name: thinq2-https
+            - containerPort: 46030
+              name: thinq1-https
+            - containerPort: 47878
+              name: thinq1-tls
+            - containerPort: 44401
+              name: management
+          volumeMounts:
+            - mountPath: /config
+              name: config
+            - mountPath: /state
+              name: state
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: rethink-config
+        - name: state
+          persistentVolumeClaim:
+            claimName: rethink-state-pvc

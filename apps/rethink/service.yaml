@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rethink
+  namespace: homeassistant
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: "192.168.1.212"
+spec:
+  type: LoadBalancer
+  selector:
+    app: rethink
+  ports:
+    - name: thinq2-https
+      port: 4433
+      targetPort: 4433
+    - name: thinq1-https
+      port: 46030
+      targetPort: 46030
+    - name: thinq1-tls
+      port: 47878
+      targetPort: 47878
+    - name: management
+      port: 44401
+      targetPort: 44401
