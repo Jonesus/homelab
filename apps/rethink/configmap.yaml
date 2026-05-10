@@ -6,7 +6,7 @@ metadata:
 data:
   config.json: |
     {
-      "hostname": "rethink-cloud.internal",
+      "hostname": "rethink.lan",
       "homeassistant": {
         "mqtt_url": "mqtt://mosquitto.homeassistant.svc.cluster.local:8883",
         "discovery_prefix": "homeassistant",

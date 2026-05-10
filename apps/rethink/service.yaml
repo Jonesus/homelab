@@ -10,6 +10,12 @@ spec:
   selector:
     app: rethink
   ports:
+    # 443 is what the appliance hits for common.lgthinq.com during the
+    # post-pairing setup handshake; rethink-cloud listens on 4433 (avoids
+    # root) so we map externally.
+    - name: thinq2-cloud
+      port: 443
+      targetPort: 4433
     - name: thinq2-https
       port: 4433
       targetPort: 4433
