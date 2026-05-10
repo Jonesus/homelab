@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hcpy
+  namespace: homeassistant
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: hcpy
+  template:
+    metadata:
+      labels:
+        app: hcpy
+    spec:
+      containers:
+        - name: hcpy
+          image: ghcr.io/hcpy2-0/hcpy:v0.4.11
+          # Bypass the image's default run.sh: it shells out to bashio::config,
+          # which queries the HA Supervisor API at http://supervisor/ and only
+          # works inside an HA add-on. Outside that context every option comes
+          # back as `null` and the script bails ("File not found null"). Invoke
+          # hc2mqtt.py directly with explicit flags instead. WORKDIR is /app
+          # in the upstream image, so the bundled discovery.yaml is reachable
+          # at /app/discovery.yaml.
+          command: ["python3", "hc2mqtt.py"]
+          args:
+            - --devices_file=/config/devices.json
+            - --mqtt_host=mosquitto.homeassistant.svc.cluster.local
+            - --mqtt_port=8883
+            - --mqtt_prefix=homeconnect/
+            - --mqtt_clientname=hcpy1
+            - --ha-discovery
+            - --discovery_file=/app/discovery.yaml
+          volumeMounts:
+            - mountPath: /config/devices.json
+              subPath: devices.json
+              name: devices
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      volumes:
+        - name: devices
+          secret:
+            secretName: hcpy-devices

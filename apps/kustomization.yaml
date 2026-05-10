@@ -12,6 +12,7 @@ resources:
   - zigbee2mqtt/app.yaml
   - mosquitto/app.yaml
   - rethink/app.yaml
+  - hcpy/app.yaml
   - matter-server/app.yaml
   - homeassistant/app.yaml
   - ha-mcp/app.yaml
