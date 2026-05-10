@@ -1,8 +1,21 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+namespace: homeassistant
+
 resources:
   - configmap.yaml
   - pvc.yaml
   - deployment.yaml
   - service.yaml
+
+# Patch /app/dist/cloud/ha_bridge.js inside the upstream image to register an
+# additional model mapping (LG CV74J7S2QA → existing F_V8_Y___W.B_2QEUK
+# handler). The file is mounted via subPath in deployment.yaml. Keeping it as
+# a real .js source keeps it diffable and ready to PR upstream.
+configMapGenerator:
+  - name: rethink-ha-bridge
+    files:
+      - overlays/ha_bridge.js
+generatorOptions:
+  disableNameSuffixHash: true

@@ -37,6 +37,13 @@ spec:
               subPath: config.json
               name: config
               readOnly: true
+            # Overlay /app/dist/cloud/ha_bridge.js with a patched copy that
+            # registers our LG washer/dryer model. See
+            # overlays/ha_bridge.js + kustomization.yaml.
+            - mountPath: /app/dist/cloud/ha_bridge.js
+              subPath: ha_bridge.js
+              name: ha-bridge
+              readOnly: true
             - mountPath: /state
               name: state
           resources:
@@ -50,6 +57,9 @@ spec:
         - name: config
           configMap:
             name: rethink-config
+        - name: ha-bridge
+          configMap:
+            name: rethink-ha-bridge
         - name: state
           persistentVolumeClaim:
             claimName: rethink-state-pvc
