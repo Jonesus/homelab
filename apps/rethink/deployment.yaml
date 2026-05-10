@@ -30,8 +30,13 @@ spec:
             - containerPort: 44401
               name: management
           volumeMounts:
-            - mountPath: /config
+            # rethink-cloud reads /app/config.json (its working dir is /app)
+            # and ignores anything at /config — subPath-mount to overwrite
+            # the image's default in-place.
+            - mountPath: /app/config.json
+              subPath: config.json
               name: config
+              readOnly: true
             - mountPath: /state
               name: state
           resources:
