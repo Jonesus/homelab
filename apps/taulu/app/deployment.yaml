@@ -18,7 +18,7 @@ spec:
       securityContext:
         fsGroup: 1000
       containers:
-        - image: ghcr.io/jonesus/taulu-api:sha-f8b0621
+        - image: ghcr.io/jonesus/taulu-api:sha-eca3eb7
           name: taulu
           envFrom:
             - secretRef:
