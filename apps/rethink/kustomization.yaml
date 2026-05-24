@@ -10,13 +10,14 @@ resources:
   - service.yaml
 
 # Patch /app/dist/cloud/ha_bridge.js inside the upstream image to register an
-# additional model mapping (LG CV74J7S2QA → existing F_V8_Y___W.B_2QEUK
-# handler). The file is mounted via subPath in deployment.yaml. Keeping it as
-# a real .js source keeps it diffable and ready to PR upstream.
+# additional model mapping (LG CV74J7S2QA → its own F_VB_F___W.B_2QEUK
+# washer/dryer combo handler) and overlay the new handler itself. The files
+# are mounted via subPath in deployment.yaml. Keeping them as real .js source
+# keeps them diffable and ready to PR upstream (anszom/rethink#52).
 configMapGenerator:
   - name: rethink-ha-bridge
     files:
       - overlays/ha_bridge.js
-      - overlays/F_V8_Y___W.B_2QEUK.js
+      - overlays/F_VB_F___W.B_2QEUK.js
 generatorOptions:
   disableNameSuffixHash: true

@@ -1,101 +1,37 @@
 import HADevice from './base.js';
 import { allowExtendedType } from '../../util/casting.js';
 import AABBDevice from './aabb_device.js';
-const ERRORS = [
-    'OK',
-    'Door lock error (DE2)',
-    'Door open error (DE1)',
-    'Water supply error (IE)',
-    'Water drain error (OE)',
-    'Out of balance error (UE)',
-    'Overfill error (FE)',
-    'Water level sensor error (PE)',
-    'Temperature sensor error (TE)',
-    'Locked motor error (LE)',
-    undefined,
-    'Unknown error (dHE)',
-    'Power fail error (PF)',
-    'Unknown error (FF)',
-    'Unknown error (DCE)',
-    'Unknown error (AE)',
-    'EEPROM error',
-    'Unknown error (PS)',
-    'Door sensor error (DE4)',
-    'Vibration sensor error (VS)',
-    'Unknown error (LE8)',
-    'Unknown error (LE9)',
-    'Unknown error (ED1)',
-    'Unknown error (ED2)',
-    'Unknown error (ED3)',
-    'Unknown error (ED4)',
-    'Unknown error (ED5)',
-];
-const STATES = [
-    'Off',
-    'Ready',
-    'Paused',
-    'Delayed',
-    'Measuring',
-    'Pre-wash',
-    'Washing',
-    'Rinsing',
-    'Spinning',
-    'Drying',
-    'End',
-    'Cooling',
-    'Rinse Hold',
-    undefined,
-    'Refreshing',
-    'Steam_softening',
-    'Demo',
-    undefined,
-    'Error',
-    'Auto_dt_open_pause',
-];
-const COURSES = {
-    0x1: 'Cotton',
-    0x2: 'Easy Care',
-    0x4: 'Eco 40-60',
-    0x5: 'Duvet',
-    0x7: 'Mix',
-    0x8: 'Sports Wear',
-    0x9: 'Night Wash',
-    0xc: 'Quick 14',
-    0xd: 'Steam Refresh', // washer/dryer combo (CV74J7S2QA)
-    0xe: 'Rinse + Spin',
-    0x12: 'Drum Clean',
-    0x13: 'Wash + Dry', // washer/dryer combo (CV74J7S2QA)
-    0x17: 'Spin + Drain',
-    0x18: 'Dry Only', // washer/dryer combo (CV74J7S2QA)
-    0x1b: 'Hand Wash/Wool',
-    0x20: 'Delicate',
-    0x2d: 'Allergy Care',
-    0x31: 'TurboWash 39',
-    0x37: 'ezDispense Nozzle Clean', // washer/dryer combo (CV74J7S2QA)
-};
-const TEMPERATURES = [0, 10, 20, 30, 40, 50, 60, 95];
-const SPINS = [undefined, 0, 400, 500, 700, 800, 900, 1000, 1100, 1200, 1400];
+import { ERRORS, STATES, COURSES, TEMPERATURES, SPINS, DRYING_MODES } from './washer_common.js';
 const DOSES = ['Off', 'Low', 'Medium', 'High'];
-const DRY_MODES = {
-    0x2: 'Auto',
-    0x3: '30 min',
-    0x4: '60 min',
-    0x6: '120 min',
-    0xa: 'Iron Dry',
-    0xb: 'Sensor Dry',
-};
 export default class Device extends AABBDevice {
     constructor(HA, thinq, meta) {
         super(HA, thinq);
         this.setConfig(allowExtendedType({
-            ...HADevice.config(meta, { name: 'LG F4WV709P1E' }),
+            ...HADevice.config(meta, { name: 'LG Washer/Dryer' }),
             components: {
                 power: {
-                    platform: 'binary_sensor',
+                    platform: 'switch',
                     unique_id: '$deviceid-power',
                     state_topic: '$this/power',
-                    name: 'Power',
+                    command_topic: '$this/power/set',
+                    name: '',
                     icon: 'mdi:washing-machine',
+                },
+                start: {
+                    platform: 'button',
+                    unique_id: '$deviceid-start',
+                    command_topic: '$this/start/set',
+                    payload_press: '',
+                    name: 'Start',
+                    icon: 'mdi:play-circle-outline',
+                },
+                pause: {
+                    platform: 'button',
+                    unique_id: '$deviceid-pause',
+                    command_topic: '$this/pause/set',
+                    payload_press: '',
+                    name: 'Pause',
+                    icon: 'mdi:pause-circle-outline',
                 },
                 status: {
                     platform: 'sensor',
@@ -151,12 +87,40 @@ export default class Device extends AABBDevice {
                     unit_of_measurement: 'RPM',
                     value_template: "{{ value if value | is_number else 'None' }}",
                 },
+                drying_mode: {
+                    platform: 'sensor',
+                    unique_id: '$deviceid-drying-mode',
+                    state_topic: '$this/drying_mode',
+                    name: 'Drying mode',
+                    icon: 'mdi:tumble-dryer',
+                },
                 cycles: {
                     platform: 'sensor',
                     unique_id: '$deviceid-cycles',
                     state_topic: '$this/cycles',
                     name: 'Cycle count',
-                    icon: 'mdi:rotate-3d-variant',
+                    icon: 'mdi:counter',
+                },
+                remote_start: {
+                    platform: 'binary_sensor',
+                    unique_id: '$deviceid-remote_start',
+                    state_topic: '$this/remote_start',
+                    name: 'Remote start',
+                    icon: 'mdi:play-circle-outline',
+                },
+                door_lock: {
+                    platform: 'binary_sensor',
+                    unique_id: '$deviceid-door_lock',
+                    state_topic: '$this/door_lock',
+                    name: 'Door lock',
+                    device_class: 'lock',
+                },
+                child_lock: {
+                    platform: 'binary_sensor',
+                    unique_id: '$deviceid-child_lock',
+                    state_topic: '$this/child_lock',
+                    name: 'Child lock',
+                    icon: 'mdi:lock',
                 },
                 energy: {
                     platform: 'sensor',
@@ -168,6 +132,14 @@ export default class Device extends AABBDevice {
                     state_class: 'total_increasing',
                     unit_of_measurement: 'Wh',
                 },
+                initial_time: {
+                    platform: 'sensor',
+                    unique_id: '$deviceid-initial_time',
+                    state_topic: '$this/initial_time',
+                    device_class: 'duration',
+                    unit_of_measurement: 'min',
+                    name: 'Initial time',
+                },
                 remaining_time: {
                     platform: 'sensor',
                     unique_id: '$deviceid-remaining_time',
@@ -178,7 +150,7 @@ export default class Device extends AABBDevice {
                 },
                 delay_end: {
                     platform: 'sensor',
-                    unique_id: '$deviceid-delay-end',
+                    unique_id: '$deviceid-delay_end',
                     state_topic: '$this/delay_end',
                     name: 'Delay end',
                     icon: 'mdi:timer-sand',
@@ -203,6 +175,13 @@ export default class Device extends AABBDevice {
                     device_class: 'enum',
                     options: DOSES,
                 },
+                extra_rinse: {
+                    platform: 'binary_sensor',
+                    unique_id: '$deviceid-extra_rinse',
+                    state_topic: '$this/extra_rinse',
+                    name: 'Extra rinse',
+                    icon: 'mdi:water-plus',
+                },
                 turbowash: {
                     platform: 'binary_sensor',
                     unique_id: '$deviceid-turbowash',
@@ -212,7 +191,7 @@ export default class Device extends AABBDevice {
                 },
                 eco_hybrid: {
                     platform: 'binary_sensor',
-                    unique_id: '$deviceid-eco-hybrid',
+                    unique_id: '$deviceid-eco_hybrid',
                     state_topic: '$this/eco_hybrid',
                     name: 'EcoHybrid',
                     icon: 'mdi:leaf',
@@ -231,95 +210,67 @@ export default class Device extends AABBDevice {
                     name: 'Steam',
                     icon: 'mdi:kettle-steam',
                 },
-                extra_rinse: {
-                    platform: 'binary_sensor',
-                    unique_id: '$deviceid-extra-rinse',
-                    state_topic: '$this/extra_rinse',
-                    name: 'Extra rinse',
-                    icon: 'mdi:water-plus',
-                },
-                dry: {
-                    platform: 'binary_sensor',
-                    unique_id: '$deviceid-dry',
-                    state_topic: '$this/dry',
-                    name: 'Wash + Dry',
-                    icon: 'mdi:tumble-dryer',
-                },
-                dry_mode: {
-                    platform: 'sensor',
-                    unique_id: '$deviceid-dry-mode',
-                    state_topic: '$this/dry_mode',
-                    name: 'Dry mode',
-                    icon: 'mdi:tumble-dryer',
-                    device_class: 'enum',
-                    options: ['Off', ...Object.values(DRY_MODES)],
-                },
-                remote_start: {
-                    platform: 'binary_sensor',
-                    unique_id: '$deviceid-remote-start',
-                    state_topic: '$this/remote_start',
-                    name: 'Remote Start',
-                    icon: 'mdi:remote',
-                },
-                child_lock: {
-                    platform: 'binary_sensor',
-                    unique_id: '$deviceid-child-lock',
-                    state_topic: '$this/child_lock',
-                    name: 'Child lock',
-                    icon: 'mdi:lock',
-                },
             },
         }));
     }
     start() {
-        // this is only *slightly* different to the init string for the fridge
         this.send(Buffer.from('F0ED1121010000001800', 'hex'));
     }
     processAABB(buf) {
         if (buf.length === 80 && buf[0] == 0x20) {
             const status = buf[43];
-            const error = buf[49];
-            const tremain = buf[44] * 60 + buf[45];
+            const time_remain = buf[44] * 60 + buf[45];
+            const time_initial = buf[46] * 60 + buf[47];
             const course = buf[48];
-            const temp = buf[52];
+            const error = buf[49];
             const spin = buf[51];
+            const temp = buf[52];
+            const extra_rinse = buf[53];
+            const drying_mode = buf[54];
+            const delay_end = buf[55];
+            const options = buf[57];
+            const lock_status = buf[58];
             const cycles = buf[64];
             const energy = buf[71] * 256 + buf[72];
-            // Reverse-engineered on a CV74J7S2QA washer/dryer combo.
-            // Most of these are option toggles surfaced through the panel
-            // buttons; the firmware greys them out per-program when an
-            // option doesn't apply, so on washer-only F_V8 models the bits
-            // simply never set.
-            const flags1 = buf[57]; // option bitfield 1
-            const flags2 = buf[58]; // option bitfield 2
-            const dryRequested = buf[54] >= 2;
-            const dryMode = DRY_MODES[buf[54]] ?? 'Off';
-            const extraRinse = buf[53] >= 2;
-            const delayEnd = buf[55]; // hours, 0 = off (range 3..19 when set)
-            const detergent = buf[73]; // 0=Off, 1=Low, 2=Medium, 3=High
-            const softener = buf[74]; // same encoding as detergent
+            const detergent = buf[73];
+            const softener = buf[74];
             this.publishProperty('power', status > 0 ? 'ON' : 'OFF');
-            this.publishProperty('error_message', ERRORS[error] ?? 'unknown');
+            this.publishProperty('error_message', ERRORS[error] ?? 'unknown'); // publish message before set error state
             this.publishProperty('error', error ? 'ON' : 'OFF');
             this.publishProperty('status', STATES[status] ?? 'unknown');
             this.publishProperty('course', COURSES[course] ?? 'unknown');
-            this.publishProperty('temp', TEMPERATURES[temp] ?? 'unknown');
             this.publishProperty('spin', SPINS[spin] ?? 'unknown');
+            this.publishProperty('temp', TEMPERATURES[temp] ?? 'unknown');
+            this.publishProperty('drying_mode', DRYING_MODES[drying_mode] ?? 'unknown');
             this.publishProperty('cycles', cycles);
+            this.publishProperty('remote_start', lock_status & 2 ? 'ON' : 'OFF');
+            this.publishProperty('door_lock', !(lock_status & 0x40) ? 'ON' : 'OFF'); // inverted logic, off=locked
+            this.publishProperty('child_lock', lock_status & 0x80 ? 'ON' : 'OFF');
+            this.publishProperty('initial_time', time_initial);
+            this.publishProperty('remaining_time', time_remain);
             this.publishProperty('energy', energy);
-            this.publishProperty('remaining_time', tremain);
-            this.publishProperty('delay_end', delayEnd);
+            this.publishProperty('delay_end', delay_end);
             this.publishProperty('detergent', DOSES[detergent] ?? 'unknown');
             this.publishProperty('softener', DOSES[softener] ?? 'unknown');
-            this.publishProperty('turbowash', flags1 & 0x01 ? 'ON' : 'OFF');
-            this.publishProperty('eco_hybrid', flags1 & 0x08 ? 'ON' : 'OFF');
-            this.publishProperty('prewash', flags1 & 0x40 ? 'ON' : 'OFF');
-            this.publishProperty('steam', flags1 & 0x80 ? 'ON' : 'OFF');
-            this.publishProperty('extra_rinse', extraRinse ? 'ON' : 'OFF');
-            this.publishProperty('dry', dryRequested ? 'ON' : 'OFF');
-            this.publishProperty('dry_mode', dryMode);
-            this.publishProperty('remote_start', flags2 & 0x02 ? 'ON' : 'OFF');
-            this.publishProperty('child_lock', flags2 & 0x80 ? 'ON' : 'OFF');
+            this.publishProperty('extra_rinse', extra_rinse >= 2 ? 'ON' : 'OFF');
+            this.publishProperty('turbowash', options & 0x01 ? 'ON' : 'OFF');
+            this.publishProperty('eco_hybrid', options & 0x08 ? 'ON' : 'OFF');
+            this.publishProperty('prewash', options & 0x40 ? 'ON' : 'OFF');
+            this.publishProperty('steam', options & 0x80 ? 'ON' : 'OFF');
         }
+    }
+    setProperty(prop, mqttValue) {
+        if (prop === 'power') {
+            if (mqttValue === 'ON') {
+                this.send(Buffer.from('F02A0100', 'hex'));
+            }
+            else if (mqttValue === 'OFF') {
+                this.send(Buffer.from('F024010100', 'hex'));
+            }
+        }
+        if (prop === 'pause')
+            this.send(Buffer.from('F024040100', 'hex'));
+        if (prop === 'start')
+            this.send(Buffer.from(mqttValue || 'F024050100', 'hex'));
     }
 }

@@ -37,17 +37,18 @@ spec:
               subPath: config.json
               name: config
               readOnly: true
-            # Overlay /app/dist/cloud/ha_bridge.js + the F_V8 device handler
-            # with patched copies that register our LG washer/dryer model and
-            # decode the additional dose / option / child-lock state. See
-            # overlays/*.js + kustomization.yaml. Both come from the same
-            # configmap (rethink-ha-bridge).
+            # Overlay /app/dist/cloud/ha_bridge.js with a patched copy that
+            # registers our LG washer/dryer combo (CV74J7S2QA → F_VB_F___W.B_2QEUK)
+            # and ship the corresponding device handler that decodes the
+            # additional dose / option / child-lock state. See overlays/*.js
+            # + kustomization.yaml. Both come from the same configmap
+            # (rethink-ha-bridge).
             - mountPath: /app/dist/cloud/ha_bridge.js
               subPath: ha_bridge.js
               name: ha-bridge
               readOnly: true
-            - mountPath: /app/dist/cloud/devices/F_V8_Y___W.B_2QEUK.js
-              subPath: F_V8_Y___W.B_2QEUK.js
+            - mountPath: /app/dist/cloud/devices/F_VB_F___W.B_2QEUK.js
+              subPath: F_VB_F___W.B_2QEUK.js
               name: ha-bridge
               readOnly: true
             - mountPath: /state
