@@ -42,11 +42,24 @@ spec:
 
         configuration:
           enabled: true
-          forceInit: true
+          forceInit: false
 
         podSecurityContext:
           fsGroup: 1000
           fsGroupChangePolicy: OnRootMismatch
+
+        # Normalize /config perms so the codeserver sidecar (uid 1000) can write
+        # files owned by the HA container (uid 0). The setgid bit on /config
+        # already pins group=coder; this ensures the group has write.
+        initContainers:
+          - name: fix-config-perms
+            image: busybox:1.36
+            command: ["sh", "-c", "chmod -R g+w /config"]
+            securityContext:
+              runAsUser: 0
+            volumeMounts:
+              - name: home-assistant
+                mountPath: /config
 
         addons:
           codeserver:
