@@ -8,7 +8,7 @@ spec:
     app: zone-configurator
   ports:
     - name: http
-      port: 8099
+      port: 42069
       targetPort: http
 ---
 # Firmware delivery to LAN ESP devices needs an externally reachable port. The

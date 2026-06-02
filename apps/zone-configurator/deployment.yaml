@@ -18,23 +18,16 @@ spec:
     spec:
       containers:
         - name: zone-configurator
-          image: everythingsmarthome/everything-presence-mmwave-configurator:1.0.2
+          image: everythingsmarthome/everything-presence-mmwave-configurator:2.1.0
           ports:
-            # Image 1.0.2 hardcodes its nginx frontend to 8099 and silently
-            # ignores APP_PORT despite what the upstream docs claim. Don't try
-            # to override it.
             - name: http
-              containerPort: 8099
+              containerPort: 42069
             - name: firmware
               containerPort: 30808
           env:
-            # The upstream Docker docs list HA_BASE_URL / HA_LONG_LIVED_TOKEN
-            # but the container actually checks HA_URL / HA_TOKEN at startup
-            # and refuses to serve without them — see the "No SUPERVISOR_TOKEN
-            # found and no HA_URL and HA_TOKEN provided" error in its logs.
-            - name: HA_URL
+            - name: HA_BASE_URL
               value: http://home-assistant.homeassistant.svc.cluster.local:8080
-            - name: HA_TOKEN
+            - name: HA_LONG_LIVED_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: zone-configurator-token
