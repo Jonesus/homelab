@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zone-configurator-ingress-internal
+  namespace: homeassistant
+  annotations:
+    cert-manager.io/cluster-issuer: "internal-ca"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: zone-configurator-internal-tls
+      hosts:
+        - hass-zones.internal
+  rules:
+    - host: hass-zones.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: zone-configurator
+                port:
+                  name: http

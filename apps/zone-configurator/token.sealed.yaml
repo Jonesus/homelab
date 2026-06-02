@@ -1,0 +1,14 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: zone-configurator-token
+  namespace: homeassistant
+spec:
+  encryptedData:
+    token: AgCfqz7NNuKVknTYvPTcKl42d0QlJNDBF8dkfHy+huwB2nc8b2LqvtJSk6dEr+RPJSOJjiyaMXo57OSIpFUi60U0TJdp5zhmuiobbRVtbaAkJiIpeFjayAPahLTgPffnuBapkuKRn2f2LbnQNl1tI7sNX6JLv5vpVFI9ZSJS3QQsssp8y7bneI3UxrGRX6OJtCjn3C38KAS83+jMmP5/1iuwugTQmR83nN6XwimNZYLY7VAwir5hNcWM1fftCS9q5XyhsJmmD26sy/IBL750j0KHUXuUwBE6J4NxBZSWQ+BartjNMBHYXOnB2CHU5FqBx0tWaqOB4Pt0MceuyTdYnLuNiTl8+0mehVgg4cCPwP1Igqq+XApc4pou46tu/drLbveRMmgKQuzCPIi+bcoIciIddhAP+NF+HbaEGJzGJQTH3egA9MpVS7YkrS52EMYV31NkXnae8aa35UzMnD9Mc6/xT19MLIkb1bTph02a1HPC1S5JYOZi9snmyA1pvXOFXCpN8WLOHhoIadtuXrvLGrFy2DoKncEJynG724/FQe/kx+cAXbGp45nnxvDelqzeSyd26fNg5l18fKbdKUDggWI6XoUlkYd462TzSNLhpB0LFxo5gk9EsubwKz0dwzuGZZy/WHo3lb/GyBwMgH7Q7GAJlSjnHZR+mDGPD+TO8tMDG6ldDj1rdl7buuI9J2EaWdfSNBu429ud7Jr06YgQDQJDu2DrZDvFWKDnQ9SUg9psoJsIQbTfvwwcTZbVnYQqg5IxLvFKI44+zZxUYA8/hpYY9njbZdcK6t1tbBz55H5QxA1dDvz2ACDj/cKpR4XKkqWv1Eu2O+IluDg94HvdjtqKmn1YuxXzlnBrbqUFr6ElwTf2P2ryx0DapO6QB+xni1xy6IF/kx3MHEo46HDcezruJfqwlGsp7rdzI7knUjM3LWlUcBKT4Pg=
+  template:
+    metadata:
+      name: zone-configurator-token
+      namespace: homeassistant
+    type: Opaque

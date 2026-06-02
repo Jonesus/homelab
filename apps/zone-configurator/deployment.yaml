@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zone-configurator
+  namespace: homeassistant
+spec:
+  replicas: 1
+  strategy:
+    # PVC is RWO on iscsi — the old pod must release it before the new one binds.
+    type: Recreate
+  selector:
+    matchLabels:
+      app: zone-configurator
+  template:
+    metadata:
+      labels:
+        app: zone-configurator
+    spec:
+      containers:
+        - name: zone-configurator
+          image: everythingsmarthome/everything-presence-mmwave-configurator:1.0.2
+          ports:
+            - name: http
+              containerPort: 42069
+            - name: firmware
+              containerPort: 30808
+          env:
+            - name: HA_BASE_URL
+              value: http://home-assistant.homeassistant.svc.cluster.local:8080
+            - name: HA_LONG_LIVED_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: zone-configurator-token
+                  key: token
+            - name: APP_PORT
+              value: "42069"
+            # Bind firmware server to the same port we expose as NodePort so the
+            # firmware URLs the configurator hands out to ESP devices on the LAN
+            # match what they can actually reach.
+            - name: FIRMWARE_LAN_PORT
+              value: "30808"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: zone-configurator-config

@@ -16,6 +16,7 @@ resources:
   - matter-server/app.yaml
   - homeassistant/app.yaml
   - ha-mcp/app.yaml
+  - zone-configurator/app.yaml
   - miniflux/app.yaml
   - miniflux/prerequisites.yaml
   - paperless/app.yaml
