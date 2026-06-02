@@ -20,8 +20,11 @@ spec:
         - name: zone-configurator
           image: everythingsmarthome/everything-presence-mmwave-configurator:1.0.2
           ports:
+            # Image 1.0.2 hardcodes its nginx frontend to 8099 and silently
+            # ignores APP_PORT despite what the upstream docs claim. Don't try
+            # to override it.
             - name: http
-              containerPort: 42069
+              containerPort: 8099
             - name: firmware
               containerPort: 30808
           env:
@@ -36,8 +39,6 @@ spec:
                 secretKeyRef:
                   name: zone-configurator-token
                   key: token
-            - name: APP_PORT
-              value: "42069"
             # Bind firmware server to the same port we expose as NodePort so the
             # firmware URLs the configurator hands out to ESP devices on the LAN
             # match what they can actually reach.
