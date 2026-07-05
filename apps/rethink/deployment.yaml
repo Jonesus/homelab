@@ -19,7 +19,10 @@ spec:
         - name: rethink
           # ghcr.io/anszom/rethink has only a `:dev` tag — no `:latest` is
           # published (no stable release has been cut as of 2026-05).
+          # `:dev` is a mutable rolling tag (rebuilt on every push to
+          # anszom/rethink master), so always re-pull to track mainline.
           image: ghcr.io/anszom/rethink:dev
+          imagePullPolicy: Always
           ports:
             - containerPort: 4433
               name: thinq2-https
@@ -37,20 +40,10 @@ spec:
               subPath: config.json
               name: config
               readOnly: true
-            # Overlay /app/dist/cloud/ha_bridge.js with a patched copy that
-            # registers our LG washer/dryer combo (CV74J7S2QA → F_VB_F___W.B_2QEUK)
-            # and ship the corresponding device handler that decodes the
-            # additional dose / option / child-lock state. See overlays/*.js
-            # + kustomization.yaml. Both come from the same configmap
-            # (rethink-ha-bridge).
-            - mountPath: /app/dist/cloud/ha_bridge.js
-              subPath: ha_bridge.js
-              name: ha-bridge
-              readOnly: true
-            - mountPath: /app/dist/cloud/devices/F_VB_F___W.B_2QEUK.js
-              subPath: F_VB_F___W.B_2QEUK.js
-              name: ha-bridge
-              readOnly: true
+            # NOTE: the LG washer/dryer combo (CV74J7S2QA → F_VB_F___W.B_2QEUK)
+            # handler was mainlined into anszom/rethink, so it now ships in the
+            # `:dev` image — the previous ha_bridge.js / device-handler overlays
+            # have been removed.
             - mountPath: /state
               name: state
           resources:
@@ -64,9 +57,6 @@ spec:
         - name: config
           configMap:
             name: rethink-config
-        - name: ha-bridge
-          configMap:
-            name: rethink-ha-bridge
         - name: state
           persistentVolumeClaim:
             claimName: rethink-state-pvc
