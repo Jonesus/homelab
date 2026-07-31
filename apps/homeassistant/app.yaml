@@ -18,7 +18,7 @@ spec:
       releaseName: home-assistant
       valuesObject:
         image:
-          tag: "2026.4.4"
+          tag: "2026.7.4"
 
         ingress:
           enabled: true
