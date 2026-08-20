@@ -21,8 +21,12 @@ spec:
     spec:
       # No volumes: these pods write nothing to disk. Photographs go to Garage
       # over S3, sessions and the task queue are in Postgres, and the collected
-      # static is baked into the image. The image already runs as a non-root
-      # user; this states it where the PodSecurity admission can see it.
+      # static is baked into the image.
+      #
+      # `runAsNonRoot` needs no `runAsUser` beside it: the image's `USER` is
+      # numeric (1000:1000, pinned in the Dockerfile), which is the only thing
+      # the kubelet can check. It refuses to start a container whose image names
+      # its user, so this pairing is what the image was changed for.
       securityContext:
         runAsNonRoot: true
         seccompProfile:
@@ -31,7 +35,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: api
-          image: ghcr.io/boissit/treffit-backend:sha-bd3c9eb
+          image: ghcr.io/boissit/treffit-backend:sha-16d2839
           # The Dockerfile's CMD takes gunicorn's default of **one** worker,
           # which is one request at a time per pod. Fine for `docker compose` on
           # a laptop and not for the only API a beta has. Sync workers: reads of
