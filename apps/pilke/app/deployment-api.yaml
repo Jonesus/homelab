@@ -35,7 +35,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: api
-          image: ghcr.io/boissit/treffit-backend:sha-16d2839
+          image: ghcr.io/boissit/treffit-backend:sha-e7c809e
           # The Dockerfile's CMD takes gunicorn's default of **one** worker,
           # which is one request at a time per pod. Fine for `docker compose` on
           # a laptop and not for the only API a beta has. Sync workers: reads of

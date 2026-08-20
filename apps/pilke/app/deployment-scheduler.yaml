@@ -36,7 +36,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: scheduler
-          image: ghcr.io/boissit/treffit-backend:sha-16d2839
+          image: ghcr.io/boissit/treffit-backend:sha-e7c809e
           command: ["python", "manage.py", "run_scheduler"]
           envFrom:
             - configMapRef:
