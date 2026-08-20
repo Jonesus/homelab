@@ -9,6 +9,31 @@ is community forks — and over SeaweedFS, which is a four-component deployment
 for a job this size and has an open barman-cloud incompatibility. Garage is one
 binary and one volume.
 
+## The secret
+
+`prerequisites/secrets.unsealed.yaml`, sealed with `./create-secrets.bash`.
+`*.unsealed.yaml` is gitignored; only the sealed output is committed.
+
+⚠️ `rpc-secret` must be **exactly** 32 bytes of hex — `openssl rand -hex 32`.
+Garage refuses to start on anything else. `admin-token` is free-form;
+`openssl rand -base64 32`.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: garage-secrets
+  namespace: garage
+type: Opaque
+stringData:
+  rpc-secret: ""
+  admin-token: ""
+```
+
+The S3 access key for Pilke is **not** here. Garage mints its own, so it does not
+exist until the bootstrap below has run — and it is sealed into `apps/pilke`
+rather than into this namespace, because that is where it is read.
+
 ## Bootstrap, once
 
 ⚠️ **A fresh Garage does nothing until its layout is assigned.** Until then every
