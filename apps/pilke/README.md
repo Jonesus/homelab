@@ -14,10 +14,14 @@ live in a comment: the order things have to happen in, and what is still open.
 
 ## Before the first sync
 
-1. **Seal the three secrets.** Copy each `prerequisites/*.unsealed.yaml.example`
-   to `*.unsealed.yaml` (gitignored), fill it in, then run
-   `./create-secrets.bash` and commit the sealed output. `prerequisites/` does
-   not build until all three exist.
+1. **Seal the secrets.** Copy each `prerequisites/*.unsealed.yaml.example` to
+   `*.unsealed.yaml` (gitignored), fill it in, then run `./create-secrets.bash`
+   and commit the sealed output. `prerequisites/` does not build until all three
+   exist.
+
+   `pilke-postgres-user` and `pilke-app-secrets` need nothing from anywhere —
+   both are generated. `ghcr-pull` needs a GitHub token with `read:packages`,
+   and it is the only one that cannot be produced from this repository.
 2. **Bootstrap Garage**, following [its README](../garage/README.md): assign
    the layout, create the `assets` bucket, allow website access on it, and mint
    the key. Step 4 there prints the credentials that go into
