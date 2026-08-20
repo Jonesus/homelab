@@ -175,9 +175,35 @@ Each step's check is what says it worked.
 
 ## Steady state
 
-CI pushes `sha-<7>`; bump that tag in the four places it appears under `app/`
-and commit. Argo runs `pilke-migrate`, then rolls the Deployments. One commit
-per deploy, and the tag in git is the record of what is running.
+Bump `sha-<7>` in the four places it appears under `app/` — the three Deployments
+and the migration Job — and commit. Argo runs `pilke-migrate` as a `PreSync`
+hook, which applies migrations and `createcachetable`, then rolls the
+Deployments. One commit per deploy, and the tag in git is the record of what is
+running.
+
+⚠️ **CI does not build that image right now.** Every Actions job in the `boissit`
+organisation has failed at zero steps since 16 August 2026 with a billing
+annotation, so images are built and pushed by hand, with the gate CI would have
+applied applied by hand too. The procedure is
+[`docs/releasing.md`](https://github.com/boissit/treffit-backend/blob/main/docs/releasing.md)
+in `treffit-backend`; tracked as boissit/pilke-app#54.
+
+⚠️ **A ConfigMap change needs a restart and Argo will not tell you.**
+`prerequisites/configmap.yaml` is read with `envFrom`, resolved once at pod
+start, so a commit to it reports Synced *and* Healthy with the old values still
+live:
+
+```bash
+kubectl -n pilke rollout restart deploy/pilke-api deploy/pilke-worker deploy/pilke-scheduler
+```
+
+Check what is running rather than what was committed — `/healthz` answering 200
+proves the database is reachable and nothing about which image or which config:
+
+```bash
+kubectl -n pilke get pods -o jsonpath='{range .items[*]}{.spec.containers[0].image}{"\n"}{end}' | sort -u
+kubectl -n pilke exec deploy/pilke-api -c api -- printenv SMS_BACKEND
+```
 
 Migrations do not un-apply when you revert the tag. Keep them
 backwards-compatible — additive columns, no drop in the same release that stops
