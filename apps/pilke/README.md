@@ -133,7 +133,7 @@ Each step's check is what says it worked.
      one request exercises the whole chain — `SameOriginS3Storage` returning a
      path rather than a bucket URL, the `/assets` Ingress rewriting it, and
      Garage's web endpoint answering anonymously — and nothing else does;
-   - `kubectl -n pilke logs deploy/pilke-scheduler` shows `Scheduling 4 periodic job(s)`.
+   - `kubectl -n pilke logs deploy/pilke-scheduler` shows `Scheduling 5 periodic job(s)`.
 3. **Seed.**
    ```bash
    kubectl -n pilke exec deploy/pilke-api -c api -- python manage.py seed_admin
