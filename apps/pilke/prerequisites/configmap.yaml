@@ -66,22 +66,33 @@ data:
 
   TZ: "Europe/Helsinki"
 
-  # ⚠️ SMS_BACKEND IS DELIBERATELY UNSET, AND UNSETTING IT IS A SECURITY CONTROL.
+  # ⚠️ SETTING THIS IS THE SECURITY CONTROL, NOT UNSETTING IT.
   #
-  # While no backend really texts, POST /api/auth/login returns the one-time
+  # While no backend really texts, `POST /api/auth/login` returns the one-time
   # code in its response body — so anybody who knows a registered phone number
   # owns that account. `users.login_codes` reads exactly one thing,
-  # `reaches_the_recipient`, so naming a real backend is what closes the hole
-  # and arms the send rate limit; there is no second switch.
+  # `reaches_the_recipient`, so naming a real backend is what closes the hole and
+  # what arms the send rate limit. There is no second switch.
   #
-  # Uncomment it in THE SAME COMMIT that adds ingress.yaml to
-  # kustomization.yaml, never before, and put GATEWAYAPI_TOKEN in the sealed
-  # secret at the same time. Leave GATEWAYAPI_SENDER empty (the account default
-  # is proven to deliver to Finnish numbers) and GATEWAYAPI_BASE_URL alone
-  # (this account is on the EU platform, which is the default; gatewayapi.com
-  # answers 401 "Invalid token" with a perfectly good token).
+  # It is set here in the same commit that adds `ingress.yaml` to the app's
+  # kustomization, because that Ingress is what makes the API reachable from the
+  # internet. Neither belongs without the other.
   #
-  # SMS_BACKEND: "treffit_backend.notifications.sms.GatewayApiSmsBackend"
+  # `GATEWAYAPI_TOKEN` is in the sealed secret and was proved against the live
+  # service before this was set: an empty token with this backend selected FAILS
+  # every login rather than falling back to echoing the code, which is the right
+  # failure and a poor surprise.
+  #
+  # `GATEWAYAPI_SENDER` stays empty — the account default is proven to deliver to
+  # Finnish numbers, and an unauthorised Finnish alphanumeric sender is refused
+  # or silently rewritten depending on the route. `GATEWAYAPI_BASE_URL` stays
+  # unset: this account is on the EU platform, which is the default, and
+  # `gatewayapi.com` answers 401 "Invalid token" with a perfectly good one.
+  #
+  # ⚠️ This is a per-environment choice. Every Maestro flow authenticates by
+  # reading the code out of the login response, so this host is one the e2e suite
+  # cannot drive. Local and CI keep `RecordingSmsBackend`.
+  SMS_BACKEND: "treffit_backend.notifications.sms.GatewayApiSmsBackend"
 
   # ADMIN_ALERT_BACKEND stays unset: only the logging default exists, and it
   # reports reaches_an_admin = False. That flag is what entitles the app's copy

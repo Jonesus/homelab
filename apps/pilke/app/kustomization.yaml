@@ -9,12 +9,11 @@ resources:
   - service.yaml
   - ingress-internal.yaml
   - assets-route.yaml
-  # ⚠️ ingress.yaml is deliberately not listed. It is what makes the API
-  # reachable from the internet, and the login endpoint returns the one-time
-  # code in its response body until SMS_BACKEND is set. Add this line and
-  # uncomment SMS_BACKEND in configmap.yaml in ONE commit, after api.pilke.app
-  # resolves publicly — never separately.
-  # - ingress.yaml
-  # - assets-route-public.yaml
+  # ⚠️ These two make the API reachable from the internet. They arrived in the
+  # same commit that set SMS_BACKEND in the ConfigMap, which is what stops the
+  # login endpoint returning the one-time code in its response body. If either
+  # is ever removed, remove the other.
+  - ingress.yaml
+  - assets-route-public.yaml
 
 namespace: pilke
