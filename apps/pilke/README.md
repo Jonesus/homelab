@@ -14,23 +14,99 @@ live in a comment: the order things have to happen in, and what is still open.
 
 ## Before the first sync
 
-1. **Seal the secrets.** Copy each `prerequisites/*.unsealed.yaml.example` to
-   `*.unsealed.yaml` (gitignored), fill it in, then run `./create-secrets.bash`
-   and commit the sealed output. `prerequisites/` does not build until all three
-   exist.
+### The secrets
 
-   `pilke-postgres-user` and `pilke-app-secrets` need nothing from anywhere —
-   both are generated. `ghcr-pull` needs a GitHub token with `read:packages`,
-   and it is the only one that cannot be produced from this repository.
-2. **Bootstrap Garage**, following [its README](../garage/README.md): assign
-   the layout, create the `assets` bucket, allow website access on it, and mint
-   the key. Step 4 there prints the credentials that go into
-   `app-secrets.unsealed.yaml` here, so it has to happen before these secrets
-   are sealed.
-3. **Back up the sealed-secrets controller key**, if it has not been done. This
-   is a cluster-wide gap rather than a Pilke one, and it is what decides whether
-   a rebuild can decrypt anything in this repo — including the database
-   credential you would be restoring with:
+Write each one as `prerequisites/<name>.unsealed.yaml` — `*.unsealed.yaml` is
+gitignored — then run `./create-secrets.bash` and commit only the sealed output.
+`prerequisites/` does not build until all three exist.
+
+**`database-user.unsealed.yaml`.** CNPG reads this at bootstrap (`initdb.secret`)
+to create the role, and the Deployments read the same two keys as
+`POSTGRES_USER` and `POSTGRES_PASSWORD` — one copy of the credential, unlike
+miniflux and paperless which also seal a whole connection string beside it.
+Generate the password with `openssl rand -hex 32`.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pilke-postgres-user
+  namespace: pilke
+type: kubernetes.io/basic-auth
+stringData:
+  username: treffit
+  password: ""
+```
+
+**`app-secrets.unsealed.yaml`.** Only `SECRET_KEY` is needed to sync; the rest
+arrive as they are obtained, and a key that is **absent** behaves as its default
+while an empty string does not always. `settings.py` has no default for
+`SECRET_KEY`, so a missing one fails loudly at import rather than signing with a
+known value — generate it with
+`python -c "import secrets; print(secrets.token_urlsafe(64))"`.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pilke-app-secrets
+  namespace: pilke
+type: Opaque
+stringData:
+  SECRET_KEY: ""
+
+  # From `garage key create pilke` — see ../garage/README.md. boto3 reads these
+  # from the environment, which is why they are not in MEDIA_STORAGE_OPTIONS,
+  # where they would be a ConfigMap holding a secret.
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
+
+  # Expo push. Without it, notifications are accepted and never delivered.
+  EXPO_ACCESS_TOKEN: ""
+
+  # GatewayAPI, EU platform. ⚠️ Leave this out entirely until the public Ingress
+  # goes live: `SMS_BACKEND` in the ConfigMap is what arms it, and an empty token
+  # with that backend selected FAILS every login rather than falling back to
+  # echoing the code. That pairing is the safety property.
+  GATEWAYAPI_TOKEN: ""
+
+  # What `seed_admin` reads. The phone number is a real login identity: with SMS
+  # live, it is where the admin's one-time codes are texted.
+  DJANGO_SUPERUSER_PHONE_NUMBER: ""
+  DJANGO_SUPERUSER_PASSWORD: ""
+  DJANGO_SUPERUSER_EMAIL: ""
+  DJANGO_SUPERUSER_NICKNAME: ""
+  DJANGO_SUPERUSER_GENDER: "other"
+  DJANGO_SUPERUSER_BIRTHDAY: "1970-01-01"
+  DJANGO_SUPERUSER_DATE_LOCATION_PREFERENCE: "POINT(24.94 60.17)"
+  DJANGO_SUPERUSER_DATE_LOCATION_PREFERENCE_RADIUS: "5"
+```
+
+**`ghcr-pull.unsealed.yaml`.** The only one that cannot be produced from this
+repository. `ghcr.io/boissit/treffit-backend` is private and has to stay private
+— the image is `COPY ./ /app` of the source — and no other app here needs a pull
+secret. Use a **classic** token with `read:packages` and nothing else;
+fine-grained tokens are unreliable for reading an organisation's packages.
+
+```bash
+kubectl create secret docker-registry ghcr-pull --namespace pilke \
+  --docker-server=ghcr.io --docker-username=<github-username> \
+  --docker-password=<token> \
+  --dry-run=client -o yaml > prerequisites/ghcr-pull.unsealed.yaml
+```
+
+⚠️ Write the token's expiry down somewhere you will see it. When it lapses every
+pod fails with `ImagePullBackOff` and nothing else explains why.
+
+### And two things around them
+
+1. **Bootstrap Garage** first, following [its README](../garage/README.md): the
+   S3 key does not exist until it has been minted, and it belongs in
+   `app-secrets.unsealed.yaml` above.
+2. **Back up the sealed-secrets controller key**, if it has not been done. A
+   cluster-wide gap rather than a Pilke one, and it decides whether a rebuild can
+   decrypt anything in this repo — including the database credential you would be
+   restoring with:
    ```bash
    kubectl -n kube-system get secret \
      -l sealedsecrets.bitnami.com/sealed-secrets-key=active \
