@@ -171,6 +171,7 @@ DNS work required.
 | Immich | `immich.boiss.it`, `kuvat.palosuo.fi` | `immich.internal` |
 | Miniflux | `rss.boiss.it` | `rss.internal` |
 | Paperless | `paperless.boiss.it` | `paperless.internal` |
+| Pilke API | `api.pilke.app` | `pilke.internal` |
 | Taulu | `taulu.boiss.it` | `taulu.internal` |
 | Vaultwarden | `vault.boiss.it` | `vault.internal` |
 

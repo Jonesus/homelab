@@ -1,0 +1,32 @@
+# ⚠️ NOT IN kustomization.yaml YET. It travels with ingress.yaml — the same
+# commit, for the same reason. See the note there.
+#
+# The public half of `assets-route.yaml`; everything about how it works is
+# explained there.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pilke-ingress-assets-public
+  namespace: pilke
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/upstream-vhost: "assets.web.garage.internal"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/service-upstream: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: pilke-tls
+      hosts:
+        - api.pilke.app
+  rules:
+    - host: api.pilke.app
+      http:
+        paths:
+          - path: /assets(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: pilke-assets
+                port:
+                  name: web

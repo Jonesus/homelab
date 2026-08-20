@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pilke-config
+  namespace: pilke
+data:
+  # `ENV=prod` hard-forces DEBUG=False in settings.py regardless of DEBUG, so
+  # both is redundant on purpose. It is load-bearing past convention: with DEBUG
+  # off, `manage.py reset_penalties` refuses to run without --force, which is
+  # what you want on a database holding real users' cooldowns.
+  ENV: "prod"
+  DEBUG: "0"
+  DJANGO_SETTINGS_MODULE: "treffit_backend.settings"
+
+  # Space-separated. `localhost` is here so the readiness probe can send it as a
+  # Host header without coupling the probe to a public hostname.
+  DJANGO_ALLOWED_HOSTS: "api.pilke.app pilke.internal localhost"
+
+  # Space-separated AND scheme-qualified, unlike ALLOWED_HOSTS. Without it the
+  # admin's own login POST is rejected with "Origin checking failed", which
+  # reads as a mystery rather than as a setting.
+  CSRF_TRUSTED_ORIGINS: "https://api.pilke.app https://pilke.internal"
+
+  DATABASE_ENGINE: "django.contrib.gis.db.backends.postgis"
+  DATABASE_HOST: "pilke-postgres-rw"
+  DATABASE_PORT: "5432"
+  POSTGRES_DB: "treffit"
+
+  # Photographs live in Garage rather than on a volume, so there is no
+  # ASSETS_DIR and the api pods mount nothing.
+  #
+  # `SameOriginS3Storage` is the project's own subclass, and the reason the app
+  # needs no release for this: it stores in the bucket but answers `/assets/…`,
+  # the same relative path `FileSystemStorage` produced. The client concatenates
+  # that onto the API base, and the base is compiled into the bundle.
+  MEDIA_STORAGE_BACKEND: "treffit_backend.utils.storage.SameOriginS3Storage"
+
+  # `file_overwrite: false` is not a preference. django-storages defaults it to
+  # true, which skips Django's `get_available_name` — so two users who both
+  # upload `photo.jpg` would land on the same key and the second would replace
+  # the first's face. False restores the suffixing the filesystem backend did.
+  #
+  # Path addressing because Garage's virtual-host style needs a wildcard DNS
+  # entry under `s3_region`, and the cluster has none.
+  MEDIA_STORAGE_OPTIONS: >-
+    {"bucket_name": "assets",
+     "endpoint_url": "http://garage.garage.svc.cluster.local:3900",
+     "region_name": "garage",
+     "addressing_style": "path",
+     "file_overwrite": false}
+
+  # NOTE: STATIC_DIR is deliberately absent. The Dockerfile runs collectstatic
+  # at build time into /app/static, which is STATIC_ROOT's default, and
+  # WhiteNoise serves from there. Pointing STATIC_DIR at an empty volume is the
+  # one reliable way to undo that and leave the admin unstyled.
+
+  PUSH_BACKEND: "treffit_backend.notifications.push.ExpoPushBackend"
+
+  TZ: "Europe/Helsinki"
+
+  # ⚠️ SMS_BACKEND IS DELIBERATELY UNSET, AND UNSETTING IT IS A SECURITY CONTROL.
+  #
+  # While no backend really texts, POST /api/auth/login returns the one-time
+  # code in its response body — so anybody who knows a registered phone number
+  # owns that account. `users.login_codes` reads exactly one thing,
+  # `reaches_the_recipient`, so naming a real backend is what closes the hole
+  # and arms the send rate limit; there is no second switch.
+  #
+  # Uncomment it in THE SAME COMMIT that adds ingress.yaml to
+  # kustomization.yaml, never before, and put GATEWAYAPI_TOKEN in the sealed
+  # secret at the same time. Leave GATEWAYAPI_SENDER empty (the account default
+  # is proven to deliver to Finnish numbers) and GATEWAYAPI_BASE_URL alone
+  # (this account is on the EU platform, which is the default; gatewayapi.com
+  # answers 401 "Invalid token" with a perfectly good token).
+  #
+  # SMS_BACKEND: "treffit_backend.notifications.sms.GatewayApiSmsBackend"
+
+  # ADMIN_ALERT_BACKEND stays unset: only the logging default exists, and it
+  # reports reaches_an_admin = False. That flag is what entitles the app's copy
+  # to stop short of promising a person reads a safety report, so setting this
+  # without a real mail path would make the shipped copy untrue
+  # (treffit-backend#22).
+
+  # DECLINE_LADDER_ENABLED stays unset. Every `hidden` cooldown removes a user
+  # from everybody's platter, so at beta pool sizes that rule's cost falls on
+  # the users it exists to protect.
+
+  # MEDIA_STORAGE_BACKEND / MEDIA_STORAGE_OPTIONS stay unset — the PVC decision
+  # expressed as a variable. Moving to an object store would also change
+  # `assetUrl` in pilke-app, because the client builds photo URLs by
+  # concatenating the API origin with the path the API returns.

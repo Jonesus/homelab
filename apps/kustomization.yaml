@@ -23,5 +23,9 @@ resources:
   - paperless/prerequisites.yaml
   - taulu/app.yaml
   - taulu/prerequisites.yaml
+  - garage/app.yaml
+  - garage/prerequisites.yaml
+  - pilke/app.yaml
+  - pilke/prerequisites.yaml
   - backup-photos/app.yaml
   - internal-ingresses/app.yaml

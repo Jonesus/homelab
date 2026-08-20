@@ -1,0 +1,25 @@
+# Copy to ghcr-pull.unsealed.yaml, fill in, then run ../create-secrets.bash.
+#
+# ghcr.io/boissit/treffit-backend is private and has to stay private: the image
+# is `COPY ./ /app` of the repository, so publishing the package publishes the
+# source. No other app in this cluster needs a pull secret; this one does.
+#
+# Generate the dockerconfigjson with a fine-grained PAT carrying read:packages:
+#
+#   kubectl create secret docker-registry ghcr-pull \
+#     --namespace pilke \
+#     --docker-server=ghcr.io \
+#     --docker-username=<github-username> \
+#     --docker-password=<PAT> \
+#     --dry-run=client -o yaml > ghcr-pull.unsealed.yaml
+#
+# WARNING: note the PAT's expiry somewhere you will see it. When it lapses every
+# pod fails with ImagePullBackOff and nothing else explains why.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ghcr-pull
+  namespace: pilke
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: ""

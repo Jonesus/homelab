@@ -1,0 +1,66 @@
+# Runs to completion before Argo touches the Deployments, so new code never sees
+# an unmigrated database. A failed migration fails the sync and leaves the old
+# pods serving, which is the behaviour you want.
+#
+# A Job rather than an init container: an init container runs once per replica
+# and would race itself.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pilke-migrate
+  namespace: pilke
+  labels:
+    app: pilke-migrate
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app: pilke-migrate
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: migrate
+          image: ghcr.io/boissit/treffit-backend:sha-bd3c9eb
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              python manage.py migrate --noinput
+              # NOT a migration, and `makemigrations --check` will never notice
+              # it missing. CACHES is a database cache and the first write
+              # against a missing table raises ProgrammingError — and that first
+              # write is the login-code rate limit, so skipping this answers 500
+              # to every caller the moment SMS is switched on. Idempotent, which
+              # is why it belongs in every release rather than in somebody's
+              # memory of the first one.
+              python manage.py createcachetable
+          envFrom:
+            - configMapRef:
+                name: pilke-config
+            - secretRef:
+                name: pilke-app-secrets
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pilke-postgres-user
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pilke-postgres-user
+                  key: password
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi

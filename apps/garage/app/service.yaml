@@ -1,0 +1,25 @@
+# The headless Service is what gives the pod its stable DNS name, which is what
+# `rpc_public_addr` in the config names. Both are required: a StatefulSet's
+# per-pod DNS only exists if a headless Service selects it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage
+  namespace: garage
+spec:
+  clusterIP: None
+  selector:
+    app: garage
+  ports:
+    - name: s3
+      port: 3900
+      targetPort: 3900
+    - name: rpc
+      port: 3901
+      targetPort: 3901
+    - name: web
+      port: 3902
+      targetPort: 3902
+    - name: admin
+      port: 3903
+      targetPort: 3903

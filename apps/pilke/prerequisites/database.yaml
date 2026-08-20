@@ -1,0 +1,45 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pilke-postgres
+  namespace: pilke
+spec:
+  # PostGIS, not the stock CNPG image. `django.contrib.gis` is not optional
+  # here: Point, DateTimeRangeField and the distance filters are the matcher.
+  # Same shape as immich's vectorchord image — an extension-carrying build
+  # plus a bootstrap CREATE EXTENSION.
+  imageName: ghcr.io/cloudnative-pg/postgis:17-3.5-9
+  instances: 1
+
+  postgresql:
+    enableAlterSystem: true
+
+  managed:
+    roles:
+      - name: treffit
+        superuser: false
+        login: true
+
+  bootstrap:
+    initdb:
+      database: treffit
+      owner: treffit
+      secret:
+        name: pilke-postgres-user
+      # NOT postInitSQL, which miniflux, paperless and immich all use: that runs
+      # against the `postgres` database. The extension has to exist inside
+      # `treffit`, and the owner role is `superuser: false` so it could not
+      # create it later itself. There is no CreateExtension migration in the
+      # backend to fall back on, so this line is what makes the first `migrate`
+      # possible at all.
+      postInitApplicationSQL:
+        - CREATE EXTENSION IF NOT EXISTS postgis;
+
+  storage:
+    pvcTemplate:
+      storageClassName: iscsi
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi

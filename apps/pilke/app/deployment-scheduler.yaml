@@ -1,0 +1,60 @@
+# Decides *when* the recurring jobs go on the queue and does no work itself:
+# drain_outbox (1 min), poll_push_receipts (5 min), scan_for_notifications
+# (15 min), prune_task_results (daily). Separate from the worker so a slow job
+# cannot make the next tick late.
+#
+# Each tick takes a per-job cursor row with SELECT ... FOR UPDATE SKIP LOCKED,
+# so two would not double-enqueue — but a second buys nothing, since the work
+# here is enqueueing rather than doing.
+#
+# No media mount: nothing either process runs touches image files today. That
+# changes when account deletion starts unlinking photographs from a task.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pilke-scheduler
+  namespace: pilke
+  labels:
+    app: pilke-scheduler
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pilke-scheduler
+  template:
+    metadata:
+      labels:
+        app: pilke-scheduler
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: scheduler
+          image: ghcr.io/boissit/treffit-backend:sha-bd3c9eb
+          command: ["python", "manage.py", "run_scheduler"]
+          envFrom:
+            - configMapRef:
+                name: pilke-config
+            - secretRef:
+                name: pilke-app-secrets
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pilke-postgres-user
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pilke-postgres-user
+                  key: password
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+      restartPolicy: Always
