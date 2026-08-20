@@ -28,6 +28,10 @@ spec:
       labels:
         app: pilke-worker
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       imagePullSecrets:
         - name: ghcr-pull
       containers:
@@ -50,6 +54,11 @@ spec:
                 secretKeyRef:
                   name: pilke-postgres-user
                   key: password
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           resources:
             requests:
               cpu: 50m

@@ -19,9 +19,14 @@ spec:
       labels:
         app: pilke-api
     spec:
-      # No securityContext and no volumes: these pods write nothing to disk.
-      # Photographs go to Garage over S3, sessions and the task queue are in
-      # Postgres, and the collected static is baked into the image.
+      # No volumes: these pods write nothing to disk. Photographs go to Garage
+      # over S3, sessions and the task queue are in Postgres, and the collected
+      # static is baked into the image. The image already runs as a non-root
+      # user; this states it where the PodSecurity admission can see it.
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       imagePullSecrets:
         - name: ghcr-pull
       containers:
@@ -77,6 +82,11 @@ spec:
               port: 8000
             initialDelaySeconds: 20
             periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           resources:
             requests:
               cpu: 100m

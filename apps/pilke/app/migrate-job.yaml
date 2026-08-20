@@ -22,6 +22,10 @@ spec:
         app: pilke-migrate
     spec:
       restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       imagePullSecrets:
         - name: ghcr-pull
       containers:
@@ -57,6 +61,11 @@ spec:
                 secretKeyRef:
                   name: pilke-postgres-user
                   key: password
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           resources:
             requests:
               cpu: 50m

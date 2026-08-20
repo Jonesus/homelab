@@ -30,6 +30,8 @@ spec:
         fsGroup: 1000
         runAsNonRoot: true
         runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: garage
           image: dxflrs/garage:v2.3.0
@@ -77,6 +79,11 @@ spec:
               readOnly: true
             - name: data
               mountPath: /var/lib/garage
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           resources:
             requests:
               cpu: 50m
