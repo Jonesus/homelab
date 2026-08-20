@@ -35,6 +35,27 @@ spec:
       postInitApplicationSQL:
         - CREATE EXTENSION IF NOT EXISTS postgis;
 
+  # Physical base backups as volume snapshots, on the `iscsi`
+  # VolumeSnapshotClass that democratic-csi already provides and that
+  # snapshot-controller has been installed for and never used.
+  #
+  # ⚠️ `online: false` is load-bearing, not conservatism. A hot snapshot's
+  # recovery needs the WAL written between `pg_backup_start` and
+  # `pg_backup_stop`, and the record that closes the backup is written *after*
+  # the snapshot is taken — so without a WAL archive to fetch it from, a hot
+  # snapshot can restore to a cluster that refuses to start. CloudNativePG can
+  # only archive WAL to an object store, and pointing it at Garage is a separate
+  # decision (see apps/garage/README.md).
+  #
+  # The cost of `false`, stated plainly: with `instances: 1` there is no standby
+  # to take it from, so each snapshot fences the primary and the database is
+  # unavailable for its duration. That is why it runs at 03:30 rather than in
+  # the evening, when dates happen. `instances: 2` would make it free.
+  backup:
+    volumeSnapshot:
+      className: iscsi
+      online: false
+
   storage:
     pvcTemplate:
       storageClassName: iscsi
@@ -43,3 +64,16 @@ spec:
       resources:
         requests:
           storage: 10Gi
+---
+# CloudNativePG's schedule is a six-field cron: the leading field is seconds.
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: pilke-postgres-nightly
+  namespace: pilke
+spec:
+  schedule: "0 30 3 * * *"
+  backupOwnerReference: self
+  method: volumeSnapshot
+  cluster:
+    name: pilke-postgres
