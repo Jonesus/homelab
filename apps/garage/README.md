@@ -86,10 +86,9 @@ with two schemes in it. Delete the probe afterwards.
 
 ## What this is not
 
-- **Not replicated, and not yet backed up.** One node,
-  `replication_factor = 1`, and nothing copies the bucket anywhere. Durability
-  today is the NAS's pool and nothing else, which is fine while the only
-  photographs in here are yours.
+- **Not replicated.** One node, `replication_factor = 1`. Durability comes from
+  the NAS's pool and from `pilke-backup`'s hourly mirror into the backup volume,
+  which is a plain directory tree restorable without Garage running.
 - **Not multi-tenant.** One bucket, one key. A second app wanting storage gets
   its own of each, not a share of these.
 - **Not a WAL archive — yet.** It could be: CloudNativePG can only archive WAL

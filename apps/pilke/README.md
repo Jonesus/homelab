@@ -175,14 +175,42 @@ backwards-compatible — additive columns, no drop in the same release that stop
 writing them — and for anything destructive, take a dump first: the rollback is
 restore-from-dump, not `git revert`.
 
+## The restore drill
+
+The rehearsal is the deliverable; taking backups is the easy half. Run it once
+before the beta opens and again after any migration that rewrites data, and
+write down how long it took — that number is the honest RTO.
+
+1. `kubectl -n pilke scale deploy/pilke-api deploy/pilke-worker deploy/pilke-scheduler --replicas=0`
+2. `createdb treffit_restore` in the same cluster, then
+   `pg_restore -d treffit_restore --no-owner --role=treffit <newest>.dump`
+3. `select count(*) from treffit_users_user;`, `select postgis_version();`, and
+   `manage.py migrate --check` against it — pending migrations mean the dump
+   predates the running code, which is worth knowing.
+4. Confirm a photograph named in `treffit_users_user.photo` exists under
+   `/backup/media`. **Rows and photographs are backed up by two different
+   mechanisms and can drift**; this is the step that catches it.
+5. Scale back up and load one photograph end to end over HTTPS. Drop the scratch
+   database.
+
+Rehearse the snapshot path too, at least once — it is the one you will actually
+reach for. `kubectl -n pilke get backups` lists them; recovery is a **new**
+Cluster with `bootstrap.recovery.volumeSnapshots` naming the snapshot, never a
+restore into the running one.
+
+Full-loss order, which is not obvious under pressure: rebuild the cluster,
+restore the sealed-secrets key **first**, let Argo reconcile `prerequisites`,
+then restore the dump before the app Deployments start.
+
 ## What this deployment does not give you
 
-- ⚠️ **Backups. There are none.** Nothing dumps the database, nothing snapshots
-  its volume, and nothing mirrors the photographs out of Garage. That is
-  deliberate for a first sync and **must not still be true when a real person
-  registers** — a beta that loses its users' data does not get a second beta.
-  The follow-up adds them, along with the restore drill that is the actual
-  deliverable.
+- **A nightly gap in the database's availability.** The volume snapshot is a
+  cold one — see the reasoning in `database.yaml` — so with `instances: 1` it
+  fences the primary while it runs. 03:30, deliberately. `instances: 2` removes
+  it.
+- **An hourly recovery point, not a continuous one.** Making it continuous means
+  WAL archiving, which means trusting barman-cloud against Garage; that is worth
+  proving on a scratch cluster first.
 - **One of everything that holds state.** The API runs two replicas and rolls
   without downtime, but `pilke-postgres`, Garage, the worker and the scheduler
   are single and their restarts are visible. The database is the one that

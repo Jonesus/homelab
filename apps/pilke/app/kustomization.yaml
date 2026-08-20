@@ -10,6 +10,7 @@ resources:
   - service.yaml
   - ingress-internal.yaml
   - assets-route.yaml
+  - backup-cronjob.yaml
   # ⚠️ ingress.yaml is deliberately not listed. It is what makes the API
   # reachable from the internet, and the login endpoint returns the one-time
   # code in its response body until SMS_BACKEND is set. Add this line and

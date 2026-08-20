@@ -6,5 +6,6 @@ resources:
   - database-user.sealed.yaml
   - app-secrets.sealed.yaml
   - ghcr-pull.sealed.yaml
+  - backup-pvc.yaml
 
 namespace: pilke

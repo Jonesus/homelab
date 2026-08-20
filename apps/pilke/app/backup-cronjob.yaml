@@ -1,0 +1,139 @@
+# Hourly: a logical dump of the database, and a mirror of the photographs.
+#
+# Two things, because they fail differently. CloudNativePG's nightly volume
+# snapshot is the physical backup and the fast restore; this is the copy that
+# survives what a snapshot does not — an operator upgrade, a Postgres major
+# version, a corrupted volume, or Garage being the thing that broke. It is also
+# the only one you can read with `less`.
+#
+# Not WAL archiving, which is what would make the recovery point continuous
+# rather than hourly. That needs an object store CloudNativePG trusts, and
+# whether Garage is one is worth proving before the database depends on it —
+# see apps/garage/README.md.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pilke-backup
+  namespace: pilke
+spec:
+  schedule: "17 * * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 3600
+      template:
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          # The dump runs first and the mirror only if it succeeded, which is
+          # the ordering an initContainer gives for free. Two containers in one
+          # pod would race for the volume and report success independently.
+          initContainers:
+            # The same image as the database, so pg_dump's version always
+            # matches the server's.
+            - name: dump
+              image: ghcr.io/cloudnative-pg/postgis:17-3.5-9
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  echo "=== Dump started at $(date -Iseconds) ==="
+                  mkdir -p /backup/db
+                  pg_dump -Fc -h pilke-postgres-rw -U "$POSTGRES_USER" \
+                    -d "$POSTGRES_DB" \
+                    -f "/backup/db/treffit-$(date +%Y%m%dT%H%M).dump"
+                  # By count rather than by age, so an outage cannot age every
+                  # copy out at once. 48 hourly is two days.
+                  ls -1t /backup/db/*.dump | tail -n +49 | xargs -r rm -f
+                  echo "=== Dump finished at $(date -Iseconds) ==="
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: pilke-postgres-user
+                      key: password
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: pilke-postgres-user
+                      key: username
+                - name: POSTGRES_DB
+                  value: treffit
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: "1"
+                  memory: 512Mi
+          containers:
+            # Photographs out of the bucket and onto the backup volume as a
+            # plain directory tree — restorable with `cp`, and readable without
+            # Garage running at all.
+            - name: mirror
+              image: rclone/rclone:1.71
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  echo "=== Mirror started at $(date -Iseconds) ==="
+                  mkdir -p /backup/media
+                  rclone sync --stats-one-line garage:assets /backup/media
+                  echo "=== Mirror finished at $(date -Iseconds) ==="
+              env:
+                - name: RCLONE_CONFIG_GARAGE_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_GARAGE_PROVIDER
+                  value: Other
+                - name: RCLONE_CONFIG_GARAGE_ENDPOINT
+                  value: http://garage.garage.svc.cluster.local:3900
+                - name: RCLONE_CONFIG_GARAGE_REGION
+                  value: garage
+                - name: RCLONE_CONFIG_GARAGE_FORCE_PATH_STYLE
+                  value: "true"
+                - name: RCLONE_CONFIG_GARAGE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: pilke-app-secrets
+                      key: AWS_ACCESS_KEY_ID
+                - name: RCLONE_CONFIG_GARAGE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: pilke-app-secrets
+                      key: AWS_SECRET_ACCESS_KEY
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: "1"
+                  memory: 512Mi
+          restartPolicy: OnFailure
+          volumes:
+            - name: backup
+              persistentVolumeClaim:
+                claimName: pilke-backup-pvc
