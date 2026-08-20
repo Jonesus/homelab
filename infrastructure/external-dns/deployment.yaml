@@ -22,14 +22,6 @@ spec:
           args:
             - --source=ingress
             - --domain-filter=boiss.it
-            # ⚠️ The PAT in `gandi-pat` can read and write `boiss.it` and is
-            # refused on `pilke.app` — "Permission denied to read domain
-            # pilke.app", verified against the API. `GET /v5/livedns/domains`
-            # lists every domain in the organisation rather than the ones the
-            # token may touch, so the listing is not the check; a per-domain
-            # request is. Until the PAT's scope is widened, this filter is
-            # inert and `api.pilke.app` gets no record.
-            - --domain-filter=pilke.app
             - --provider=gandi
             - --txt-owner-id=external-dns
             - --default-targets=boiss.it

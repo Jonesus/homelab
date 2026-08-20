@@ -8,5 +8,7 @@ resources:
   - clusterrole.yaml
   - clusterrolebinding.yaml
   - gandi-pat.sealed.yaml
+  - gandi-pilke-pat.sealed.yaml
   - deployment.yaml
+  - deployment-pilke.yaml
   - cronjob.yaml

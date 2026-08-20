@@ -1,0 +1,53 @@
+# A second external-dns, for `pilke.app` only.
+#
+# ⚠️ Not a `--domain-filter` on the one above, which is what it looks like it
+# should be. Gandi PATs are scoped per domain and the two zones are held by
+# different tokens: `gandi-pat` reads `boiss.it` and is refused on `pilke.app`,
+# and `gandi-pilke-pat` is the mirror image. external-dns takes one credential,
+# so two credentials means two of it.
+#
+# The distinct `--txt-owner-id` is what keeps them out of each other's way: the
+# registry TXT records are how external-dns decides which entries are its own to
+# delete, and two instances sharing an owner id would each see the other's
+# records as orphans.
+#
+# `--default-targets=boiss.it` for the same reason as the other one:
+# `api.pilke.app` becomes a CNAME onto the single A record the DDNS CronJob keeps
+# current, so a new home IP is one update rather than one per hostname.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-dns-pilke
+  namespace: external-dns
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: external-dns-pilke
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: external-dns-pilke
+    spec:
+      serviceAccountName: external-dns
+      containers:
+        - name: external-dns
+          image: registry.k8s.io/external-dns/external-dns:v0.16.1
+          args:
+            - --source=ingress
+            - --domain-filter=pilke.app
+            - --provider=gandi
+            - --txt-owner-id=external-dns-pilke
+            - --default-targets=boiss.it
+          envFrom:
+            - secretRef:
+                name: gandi-pilke-pat
+          resources:
+            requests:
+              cpu: 10m
+              memory: 50Mi
+            limits:
+              cpu: 200m
+              memory: 50Mi

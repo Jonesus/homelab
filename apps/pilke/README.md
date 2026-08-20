@@ -64,10 +64,11 @@ stringData:
   # Expo push. Without it, notifications are accepted and never delivered.
   EXPO_ACCESS_TOKEN: ""
 
-  # GatewayAPI, EU platform. ⚠️ Leave this out entirely until the public Ingress
-  # goes live: `SMS_BACKEND` in the ConfigMap is what arms it, and an empty token
-  # with that backend selected FAILS every login rather than falling back to
-  # echoing the code. That pairing is the safety property.
+  # GatewayAPI, EU platform. Safe to seal before SMS is switched on — it is read
+  # only when `SMS_BACKEND` names that backend, and having it here first is what
+  # makes flipping that one line safe. ⚠️ The reverse is the dangerous order: the
+  # backend selected with an empty token FAILS every login rather than falling
+  # back to echoing the code, which is the safety property but a poor surprise.
   GATEWAYAPI_TOKEN: ""
 
   # What `seed_admin` reads. The phone number is a real login identity: with SMS

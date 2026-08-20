@@ -1,0 +1,16 @@
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  creationTimestamp: null
+  name: gandi-pilke-pat
+  namespace: external-dns
+spec:
+  encryptedData:
+    GANDI_PAT: AgBBdImRBR0FCUlnYk1hp3BEY7kd1t253EnrQbLkSVj3H+dK/h7fujqpWmdKwpUi5Oe3ojKwx/cQOFUmp1mrE2yWf6giGkwGmxgLWVaM4C8LIVG4n6hy09HggTX7wEgDktdG0ZHkP8MuDMe/3lH6pSL+sqzDlljsmwx1VNV18ulPsJEkZWss+np+8QVrV0e3VIs+gF7htZIcWYHUCiRimOOG5A8XfjgqPHF4R4NRUV/LzC+/Onwz2u9eevcYt8JzRsphRw+3oXr1kg7qgYl4ScH1rvCZuiqzhWlWjyfOvHeIhrXiEW6w3wATBM6uw3ksTUVeTj7GAlkxyEl0dD/UUfpTq5YWJaz5df5U6GiM14YhjrjJDMW2meKsXh6YJXjbfLxXbVVr2akMCsf2KKR76HwXFEnPrgCZRN0AoKq6r7seP/M2C1MOvEtLAK60T5Lk+4six9LNTRewS/nrF43C5Mgj6nPL+DUcFg3dgfgklflzNIbye2T8kVDRF2T+zxN/JbV3fh6Bxb4bcyKxHk1+EQA7+KfTIHZFPUKw7zaZJaYo1S5125Ig/L1jdlHu6Ml8U22EaYfyO2ZTBaC8MrCsn0AN97ZcRsGNErUI/31UkCn8dKHpxQLhKz3eP9H1i/6NwvaKkAMUGUzHxh3ommBvTAgai5n42KZQokoDaXtQ8YAxEe4t8hYaHNu73kUEo1hWVd6nDEuGdveog8xM/uzHnVEiGwaxK3OA6ZT0e9U/30HkSGvdm8wejFkZ
+  template:
+    metadata:
+      creationTimestamp: null
+      name: gandi-pilke-pat
+      namespace: external-dns
+    type: Opaque
+
