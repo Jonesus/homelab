@@ -1,0 +1,16 @@
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  creationTimestamp: null
+  name: ghcr-pull
+  namespace: pilke
+spec:
+  encryptedData:
+    .dockerconfigjson: AgArFxdSjgBxdnb1DS8oHIRaAiYMESvmTTec/Euznc6Vrz5WFLhs8KdzoB3NCRSI2kMKni8iaSSXbdSEve0nfK7t2GrsgfIQbSfmiMJLxpUnEE6j+2eY/WiVljrJmYbGemlz7w9s9gIainARg0gRZlxpLUSRVpeUeGloGEd9JEmYfAmP6MoIh59NyzueaRJcpFrHXkWbgcblNLBdYmG+xsV3i7DVQx64RRc++qPIAMjWTqKK2TtNXcMKRhu6Hyas6WhnXgPZPo0LktJG1o6qhD9AQWG1mYb6gMTWEp1UBkPMzjZaRe3wl2HFnVcHh3eQaoCPgmVWHK9bVdNzhmkZTt8+ognKAHt3wH1xSpubnjFjrhoTGpmtpPKbK6cQfDpf8TjP36Nmj8Wt7U1G9Z3SkZQeDG3axky66bPpeTUVDLXCWkW5lbbm0z2fE01o9aSwFgOocZRRv24H59ORS/uY+ZE+4h5xsyZdb5KBrMlkDqJzqEyz7Rix9Ekm6eiJL1u2E7NZIehNAMvU09c6hh4Xn0FQz8CqrrBUOki8i+43tNGxsizP+zhJOm8S0hYFD2i7MtrlOorp3ik2RSGhN9wUetw3tLgw/zPRwGw0DvUmzt/I1K1hX4wKLU/y68y9FEnNjK6aOyhlPLvsMYVjWIxULySTixYDdCumvJ5Nc9K1Tq/OeNZz5/vG0ZndkegD7QJlDnmeLPrAmew6ltcYg8VCdq8Iz6VKYGsgFNE5t12/73jmZwa5jPgfPHekvfKgsVv3JIkME4VLqGs0amZhs8g07AVTs1nqXKTY87t4U8gRxa+yq6hqXguHLwRw4N+KeVmENoPia+Dy7W9drfUfciAG++KTw4vZHlT1Wdm83FeuOAr1JYEuPI2o/OlYgdSgiumNQDMdKZ4qzTbya2i6euicuQIBdKlbwHxQgISVEqLf
+  template:
+    metadata:
+      creationTimestamp: null
+      name: ghcr-pull
+      namespace: pilke
+    type: kubernetes.io/dockerconfigjson
+
