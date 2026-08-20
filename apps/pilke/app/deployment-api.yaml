@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pilke-api
+  namespace: pilke
+  labels:
+    app: pilke-api
+spec:
+  # Two, and a rolling upgrade. These pods hold no volume at all now, so there
+  # is nothing to pin them to a node and nothing to detach before one moves.
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: pilke-api
+  template:
+    metadata:
+      labels:
+        app: pilke-api
+    spec:
+      # No securityContext and no volumes: these pods write nothing to disk.
+      # Photographs go to Garage over S3, sessions and the task queue are in
+      # Postgres, and the collected static is baked into the image.
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: api
+          image: ghcr.io/boissit/treffit-backend:sha-bd3c9eb
+          # The Dockerfile's CMD takes gunicorn's default of **one** worker,
+          # which is one request at a time per pod. Fine for `docker compose` on
+          # a laptop and not for the only API a beta has. Sync workers: reads of
+          # photographs never reach this process, and an upload is one PUT.
+          command:
+            - gunicorn
+            - treffit_backend.wsgi:application
+            - --bind
+            - 0.0.0.0:8000
+            - --workers
+            - "3"
+          envFrom:
+            - configMapRef:
+                name: pilke-config
+            - secretRef:
+                name: pilke-app-secrets
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pilke-postgres-user
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pilke-postgres-user
+                  key: password
+          ports:
+            - name: http
+              containerPort: 8000
+          # The Host header is required: a probe otherwise arrives with the pod
+          # IP, ALLOWED_HOSTS answers 400, and the pod never becomes ready.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          # Deliberately not /healthz. That endpoint checks the database, and a
+          # database-dependent liveness probe turns a Postgres outage into a
+          # restart loop that helps nobody. Readiness pulling the pod out of the
+          # Service is the correct response to the same condition.
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+      restartPolicy: Always

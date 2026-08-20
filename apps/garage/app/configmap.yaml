@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: garage
+  namespace: garage
+data:
+  garage.toml: |
+    # Metadata and data share one PVC. Garage's own advice is to split them so
+    # metadata lands on faster storage, which means nothing here: both would be
+    # the same iSCSI volume from the same pool on the same NAS.
+    metadata_dir = "/var/lib/garage/meta"
+    data_dir = "/var/lib/garage/data"
+    db_engine = "lmdb"
+
+    # One node, one copy. Garage exists to replicate across sites and none of
+    # that applies to a single StatefulSet — durability here comes from the
+    # NAS's pool and from the hourly mirror into the backup volume, not from
+    # Garage. Anything above 1 would refuse to start with one node in the layout.
+    replication_factor = 1
+
+    rpc_bind_addr = "[::]:3901"
+    # The StatefulSet's stable per-pod DNS name. A pod IP would change on every
+    # restart and Garage records this in the cluster layout.
+    rpc_public_addr = "garage-0.garage.garage.svc.cluster.local:3901"
+
+    [s3_api]
+    s3_region = "garage"
+    api_bind_addr = "[::]:3900"
+    root_domain = ".s3.garage.internal"
+
+    # The anonymous half. Garage implements no bucket policies and no ACLs, so
+    # the S3 endpoint always demands a signature — this is the only way an
+    # unauthenticated GET can reach an object. It routes by Host: a request for
+    # `assets.web.garage.internal` is served from the root of the `assets`
+    # bucket, which is why the Ingress in `apps/pilke` rewrites the path and
+    # sets `upstream-vhost`.
+    [s3_web]
+    bind_addr = "[::]:3902"
+    root_domain = ".web.garage.internal"
+    index = "index.html"
+
+    [admin]
+    api_bind_addr = "[::]:3903"

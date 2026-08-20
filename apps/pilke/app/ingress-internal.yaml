@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pilke-ingress-internal
+  namespace: pilke
+  annotations:
+    cert-manager.io/cluster-issuer: "internal-ca"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # nginx defaults to 1m and a phone-camera photograph through
+    # POST /users/me/photo will exceed it and 413.
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: pilke-internal-tls
+      hosts:
+        - pilke.internal
+  rules:
+    # ⚠️ Reach /admin over https://pilke.internal, not http. ssl-redirect is off
+    # here, and over plain HTTP nginx forwards X-Forwarded-Proto: http — so
+    # Django will not set cookies it has marked Secure and the login silently
+    # fails to stick. The internal-ca certificate makes https work today.
+    - host: pilke.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pilke-api
+                port:
+                  name: http

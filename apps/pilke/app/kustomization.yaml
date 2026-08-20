@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - configmap.yaml
+  - migrate-job.yaml
+  - deployment-api.yaml
+  - deployment-worker.yaml
+  - deployment-scheduler.yaml
+  - service.yaml
+  - ingress-internal.yaml
+  - assets-route.yaml
+  # ⚠️ ingress.yaml is deliberately not listed. It is what makes the API
+  # reachable from the internet, and the login endpoint returns the one-time
+  # code in its response body until SMS_BACKEND is set. Add this line and
+  # uncomment SMS_BACKEND in configmap.yaml in ONE commit, after api.pilke.app
+  # resolves publicly — never separately.
+  # - ingress.yaml
+  # - assets-route-public.yaml
+
+namespace: pilke

@@ -1,0 +1,60 @@
+# Executes the queue. `settings.TASKS` uses django_tasks_db, so the queue is
+# a Postgres table and this is the only thing that drains it. Without it no push
+# notification is ever sent and the outbox fills silently, because a filling
+# outbox is a valid state.
+#
+# Tasks are claimed with SELECT ... FOR UPDATE SKIP LOCKED, so more replicas are
+# safe. One drains a 1-minute outbox comfortably at beta size; scale up the day
+# a drain takes longer than a minute.
+#
+# No media mount: nothing either process runs touches image files today. That
+# changes when account deletion starts unlinking photographs from a task.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pilke-worker
+  namespace: pilke
+  labels:
+    app: pilke-worker
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pilke-worker
+  template:
+    metadata:
+      labels:
+        app: pilke-worker
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: worker
+          image: ghcr.io/boissit/treffit-backend:sha-bd3c9eb
+          command: ["python", "manage.py", "db_worker"]
+          envFrom:
+            - configMapRef:
+                name: pilke-config
+            - secretRef:
+                name: pilke-app-secrets
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pilke-postgres-user
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pilke-postgres-user
+                  key: password
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+      restartPolicy: Always
