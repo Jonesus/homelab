@@ -6,6 +6,17 @@
 #
 # The sealed secrets the same Job reads are already here, and for the same
 # reason. Wave -1 is what makes both exist first.
+#
+# ⚠️ **EDITING THIS FILE CHANGES NOTHING UNTIL THE PODS ARE REPLACED.** The
+# Deployments read it with `envFrom`, which is resolved once at pod start, and
+# Argo does not roll a Deployment because a ConfigMap it references changed. So
+# after every commit that touches this:
+#
+#     kubectl -n pilke rollout restart deploy/pilke-api deploy/pilke-worker deploy/pilke-scheduler
+#
+# That is a footgun in general and a security one here: `SMS_BACKEND` below is
+# what stops the login endpoint handing out one-time codes, and setting it looked
+# exactly like working while the running pods still had the old value.
 apiVersion: v1
 kind: ConfigMap
 metadata:

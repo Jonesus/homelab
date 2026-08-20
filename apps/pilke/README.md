@@ -149,7 +149,15 @@ Each step's check is what says it worked.
    answers 404 "exhausted" — which is also its answer for the ordinary case of
    nobody compatible being free, so it will not look like missing content. Do
    **not** reach for `mockdata`; it also invents ten users with `dog.jpg`.
-4. **Go public — DNS first, then one commit.** Confirm `api.pilke.app` resolves
+4. **Go public — one commit, then restart.** ⚠️ The Deployments read the
+   ConfigMap with `envFrom`, resolved once at pod start, and Argo does not roll a
+   Deployment because a ConfigMap changed. So `SMS_BACKEND` is not in effect
+   until:
+   ```bash
+   kubectl -n pilke rollout restart deploy/pilke-api deploy/pilke-worker deploy/pilke-scheduler
+   ```
+   Until that runs, the login endpoint is still handing out one-time codes in its
+   response body while the manifest says otherwise. Confirm `api.pilke.app` resolves
    (external-dns now carries `--domain-filter=pilke.app`; Let's Encrypt solves
    HTTP-01 through nginx, so the name must resolve before a certificate can
    issue). Then, in a single commit: add `ingress.yaml` to `kustomization.yaml`,
