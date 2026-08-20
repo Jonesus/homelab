@@ -1,3 +1,11 @@
+# Configuration, in `prerequisites` rather than beside the Deployments that read
+# it — because `pilke-migrate` is a `PreSync` hook, and a PreSync hook runs
+# before Argo syncs *anything* in the app, including its own ConfigMap. Leaving
+# this in `app/` made the first deploy fail with `configmap "pilke-config" not
+# found`, which reads as a missing file rather than as an ordering problem.
+#
+# The sealed secrets the same Job reads are already here, and for the same
+# reason. Wave -1 is what makes both exist first.
 apiVersion: v1
 kind: ConfigMap
 metadata:
