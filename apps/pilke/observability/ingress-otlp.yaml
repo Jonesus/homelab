@@ -1,0 +1,75 @@
+# ⚠️ NOT IN kustomization.yaml YET, ON PURPOSE. See the note there.
+#
+# This file is the moment telemetry ingest becomes reachable from the internet,
+# and it lands with Phase 3 — the app's instrumentation — and not before. Two
+# things have to be true in the same commit:
+#
+#   1. The legal gate (Phase 1b) is done. Server-side telemetry about one's own
+#      service is defensible with the privacy policy amended; collecting from a
+#      tester's phone under a policy that says there is none is not.
+#   2. The collector requires an ingest key. The gateway's config has no
+#      authentication extension today because nothing needs one while this file
+#      is unreferenced. Phase 3 adds a `bearertokenauth` extension to the
+#      gateway's OTLP receiver and ships the matching header in the bundle.
+#      A static key in a JS bundle is obfuscation and not a secret — say so
+#      rather than letting a future reader assume otherwise. It keeps a scanner
+#      from finding an open ingest, and it can be rotated.
+#
+# Until both are true, this stack has no public surface at all, which is what
+# makes Phases 0 to 2 useful on their own.
+#
+# The endpoint is a path and not a hostname because an Ingress must live in its
+# backend's namespace: the collector is in `pilke`, so telemetry goes to
+# api.pilke.app on the certificate and DNS record already in place. nginx
+# prefers the more specific path, so the API's own `/` is untouched.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pilke-otlp-ingress
+  namespace: pilke
+  annotations:
+    # ⚠️ 1m, AND THIS IS WHY THIS IS ITS OWN INGRESS OBJECT. `pilke-ingress`
+    # carries 10m because a phone-camera photograph through
+    # POST /users/me/photo needs it. Telemetry must not inherit that cap, and
+    # the photograph path must keep it — annotations are per-Ingress, so one
+    # object for both hosts one of these two values and gets the other wrong.
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+
+    # Per client address, and the failure mode being designed against is
+    # somebody pointing a load generator at an ingest endpoint whose address is
+    # in a public app bundle. The collector's `memory_limiter` is the second
+    # line; this is the cheap one, and it refuses the request before it costs
+    # anything.
+    nginx.ingress.kubernetes.io/limit-rps: "5"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+
+    # The public path is /otlp/v1/traces; the collector's OTLP receiver serves
+    # /v1/traces. A literal rewrite rather than a captured one, because exactly
+    # one path is exposed and a capture group would be a way to reach the rest.
+    nginx.ingress.kubernetes.io/rewrite-target: /v1/traces
+spec:
+  ingressClassName: nginx
+  tls:
+    # The certificate `pilke-ingress` already holds for this host, reused rather
+    # than reissued: no `cert-manager.io/cluster-issuer` annotation here, because
+    # two Ingress objects both claiming to manage one Secret is two Certificate
+    # resources fighting over one name.
+    - secretName: pilke-tls
+      hosts:
+        - api.pilke.app
+  rules:
+    - host: api.pilke.app
+      http:
+        paths:
+          # ONLY THIS PATH. No /otlp/v1/logs — the app sends spans and the
+          # DaemonSet reads the backend's stdout, so nothing outside the cluster
+          # has a reason to write log records. And no OTLP/gRPC: the collector
+          # listens on HTTP only, so there is nothing to expose.
+          - path: /otlp/v1/traces
+            pathType: Prefix
+            backend:
+              service:
+                name: otel-collector
+                port:
+                  number: 4318

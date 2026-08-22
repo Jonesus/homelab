@@ -1,0 +1,131 @@
+# Container stdout for this namespace's three Deployments, and nothing else in
+# the cluster.
+#
+# ⚠️ A DAEMONSET IS THE ONE THING IN THIS STACK THAT CANNOT BE
+# NAMESPACE-SCOPED. It runs on every node and mounts the host's log directory,
+# however narrow the glob — so the honest description is: this pod can read
+# every container's log on its node, and is configured to read three of them. It
+# holds no Kubernetes permissions at all, which is as close as this gets. The
+# strict alternative is a logging sidecar in each of the three application
+# Deployments over a shared emptyDir: genuinely namespace-scoped, and three more
+# containers inside the application's own manifests.
+#
+# What makes the scope real is in `collector-config.yaml`: the include glob is
+# `*_pilke_*.log`, and the namespace is part of the filename, so the filter
+# applies before a line is ever read. Verify it by looking at what arrived, not
+# by re-reading the pattern.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: otel-collector-agent
+  namespace: pilke
+  labels:
+    app: otel-collector-agent
+spec:
+  selector:
+    matchLabels:
+      app: otel-collector-agent
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: otel-collector-agent
+    spec:
+      # Every node, including any that carry a taint. A node whose logs are not
+      # collected is a node whose failures are invisible, and the control-plane
+      # node runs application pods in this cluster.
+      tolerations:
+        - operator: "Exists"
+          effect: "NoSchedule"
+        - operator: "Exists"
+          effect: "NoExecute"
+      # ⚠️ ROOT, AND IT IS THE ONE WORKLOAD HERE THAT IS. The kubelet writes
+      # container logs owned by root, and on some runtimes with modes that no
+      # other user can read; a non-root agent works until the node that does not
+      # is added. The compensations are the ones that matter: no capabilities at
+      # all, no privilege escalation, a read-only root filesystem, and both log
+      # mounts read-only — so this can read the host's logs and cannot touch
+      # anything else on it.
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: collector
+          image: otel/opentelemetry-collector-contrib:0.159.0
+          command:
+            - /otelcol-contrib
+            - --config=/conf/agent.yaml
+          ports:
+            - name: health
+              containerPort: 13133
+          readinessProbe:
+            httpGet:
+              path: /
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          # Small, and it should stay small: this reads three containers' output
+          # on each node. If it needs more, something is logging in a loop and
+          # the fix is upstream of here.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /conf
+              readOnly: true
+            # Read-only, both of them. The agent has no reason to write to the
+            # host's logs and every reason not to be able to.
+            - name: varlogcontainers
+              mountPath: /var/log/containers
+              readOnly: true
+            # The files under /var/log/containers are symlinks into
+            # /var/log/pods, so mounting only the first gives a directory of
+            # dangling links and an agent that reads nothing at all.
+            - name: varlogpods
+              mountPath: /var/log/pods
+              readOnly: true
+            - name: checkpoints
+              mountPath: /var/lib/otelcol-agent
+      volumes:
+        - name: config
+          configMap:
+            name: otel-collector-config
+            items:
+              - key: agent.yaml
+                path: agent.yaml
+        - name: varlogcontainers
+          hostPath:
+            path: /var/log/containers
+            type: Directory
+        - name: varlogpods
+          hostPath:
+            path: /var/log/pods
+            type: Directory
+        # Per-node state, and the one thing here that must outlive the pod: the
+        # filelog receiver's read offsets. On an emptyDir a restart would either
+        # re-read a node's log tail or skip it, depending on `start_at`.
+        - name: checkpoints
+          hostPath:
+            path: /var/lib/otelcol-agent
+            type: DirectoryOrCreate
+      restartPolicy: Always

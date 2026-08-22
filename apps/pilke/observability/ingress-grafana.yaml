@@ -1,0 +1,40 @@
+# The only way in to any of this, and it is LAN-only on purpose.
+#
+# `internal-ca` rather than `letsencrypt-prod`, matching `hass.internal` and
+# `pilke.internal`: `pilke-o11y.internal` does not resolve from the internet and
+# Let's Encrypt could not issue for it if it did.
+#
+# ⚠️ THIS PAIRING IS NOT A COINCIDENCE. Grafana here has no login form, the two
+# stores behind it have no authentication at all, and this host is unreachable
+# from outside the LAN. Those three facts hold each other up. Moving this to a
+# public issuer without adding authentication first publishes every trace and
+# every log line this application holds.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pilke-o11y-ingress-internal
+  namespace: pilke
+  annotations:
+    cert-manager.io/cluster-issuer: "internal-ca"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: pilke-o11y-internal-tls
+      hosts:
+        - pilke-o11y.internal
+  rules:
+    # ⚠️ Reach this over https, not http, for the same reason as
+    # https://pilke.internal: ssl-redirect is off here, and Grafana behind plain
+    # HTTP gets X-Forwarded-Proto: http, which breaks anything it marks Secure.
+    - host: pilke-o11y.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                # Rendered by the grafana chart in observability-charts.yaml.
+                name: pilke-grafana
+                port:
+                  number: 80

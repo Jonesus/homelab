@@ -1,0 +1,150 @@
+# THE SEAM. Everything that ends up in either store passes through this
+# Deployment: the applications export to it, the agent DaemonSet forwards to it,
+# and it is the only thing here that knows the stores' addresses.
+#
+# It exists even though both stores accept OTLP directly, for three reasons and
+# each one is load-bearing:
+#
+#   * the stores have NO AUTHENTICATION AT ALL, by design — `vmauth` is what
+#     would add it — so they must never be exposed, and this is the only process
+#     that can hold an ingest credential;
+#   * nothing else in this stack redacts, so this pod's `redaction` processor is
+#     the whole of the PII defence; and
+#   * single-replica stores get restarted, so the disk-backed sending queue here
+#     is what makes an upgrade or a node move a delay rather than a hole in the
+#     record.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  namespace: pilke
+  labels:
+    app: otel-collector
+spec:
+  # Two, because this is the ingest path for three Deployments and a DaemonSet,
+  # and a single replica makes its own rollout a gap in the telemetry. The
+  # queue below is per-pod, so a replica is not a spare copy of the buffer —
+  # it is one less second of refused connections during a restart.
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # The contrib image's own user. Named here because the queue below is an
+        # emptyDir, and `fsGroup` is what makes it writable without granting
+        # anything else.
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      # Preferred rather than required: two pods on two nodes is the point, and
+      # a single-node cluster or a drained node should still get one collector
+      # rather than none.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: otel-collector
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: collector
+          # Contrib, not the core distribution: `redaction`, `file_storage` and
+          # the `filelog` receiver the agent uses are all contrib components, and
+          # the core image has none of them. Pinned, because a collector release
+          # can rename a configuration key and the config is in git beside this.
+          image: otel/opentelemetry-collector-contrib:0.159.0
+          command:
+            - /otelcol-contrib
+            - --config=/conf/gateway.yaml
+          ports:
+            - name: otlp-http
+              containerPort: 4318
+            - name: health
+              containerPort: 13133
+          # The `health_check` extension, which reports the pipeline's state
+          # rather than the process's. A collector whose exporters are all
+          # failing is a pod that should not be receiving.
+          readinessProbe:
+            httpGet:
+              path: /
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /conf
+              readOnly: true
+            - name: queue
+              mountPath: /var/lib/otelcol
+      volumes:
+        - name: config
+          configMap:
+            name: otel-collector-config
+            # Only the gateway's half. Projecting one key rather than the whole
+            # ConfigMap means the agent's config is not sitting unused in this
+            # pod pretending to be in effect.
+            items:
+              - key: gateway.yaml
+                path: gateway.yaml
+        # An emptyDir, so the queue survives a store restart — which is the
+        # failure mode it exists for — and not this pod's own restart. A PVC
+        # here would need a StatefulSet and a third volume on the NAS, to buy
+        # five seconds of buffer that the SDKs' own retries already cover.
+        - name: queue
+          emptyDir: {}
+      restartPolicy: Always
+
+---
+# The address in `pilke-config`'s OTEL_EXPORTER_OTLP_ENDPOINT, so this name is
+# not free to change: the three application Deployments resolve it at runtime
+# and the agent DaemonSet exports to it.
+#
+# OTLP/HTTP only. No gRPC port, because nothing here speaks gRPC — the Python
+# exporter is the proto-http one and the JS exporter has no choice — and an open
+# port is a thing to reason about.
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  namespace: pilke
+  labels:
+    app: otel-collector
+spec:
+  selector:
+    app: otel-collector
+  ports:
+    - name: otlp-http
+      protocol: TCP
+      port: 4318
+      targetPort: otlp-http

@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Configuration before the workloads that mount it, so a first sync does not
+  # start two collectors against a ConfigMap that does not exist yet. Argo
+  # applies a kustomize build in dependency-free order, so this is a reading
+  # order rather than a guarantee — the collectors crash-loop for a few seconds
+  # and recover if it goes the other way.
+  - collector-config.yaml
+  - collector-gateway.yaml
+  - collector-agent.yaml
+
+  # Read by both vmalert instances, which reload them without a restart.
+  - alert-rules.yaml
+
+  # LAN only, on internal-ca.
+  - ingress-grafana.yaml
+
+  # ⚠️ ingress-otlp.yaml IS DELIBERATELY ABSENT. It is the only internet-facing
+  # object in this stack, and it lands with Phase 3: the app's instrumentation,
+  # the ingest key the collector will require, and the privacy policy amendment
+  # that makes collecting from a tester's phone lawful. Adding it before those
+  # publishes an unauthenticated ingest endpoint and collects client-side
+  # telemetry under a policy that says there is none. The reasoning is in the
+  # file itself.
+
+namespace: pilke

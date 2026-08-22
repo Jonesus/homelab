@@ -1,0 +1,31 @@
+# The plain manifests of the telemetry stack: the two OpenTelemetry collectors,
+# their configuration, the alert rules, and the Ingress objects. The four Helm
+# charts they talk to are separate Applications in `observability-charts.yaml`,
+# because a chart and a kustomize directory cannot be one Argo source.
+#
+# No sync wave. This app's manifests reference the charts' Services by name and
+# nothing more, and a Service name resolves whenever the Service appears — so a
+# collector that starts before VictoriaLogs does retries its exports and catches
+# up rather than failing to start. Ordering here would buy nothing and would
+# make the two halves of one stack look dependent when they are not.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pilke-observability
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: pilke
+    server: https://kubernetes.default.svc
+  project: apps
+  source:
+    path: apps/pilke/observability
+    repoURL: https://github.com/jonesus/homelab
+    targetRevision: HEAD
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

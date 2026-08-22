@@ -1,0 +1,195 @@
+# The five rules. This file is the answer to "a log nobody watches".
+#
+# ⚠️ TWO ConfigMaps, ONE PER STORE, AND THE SPLIT IS NOT COSMETIC. vmalert takes
+# a single `-datasource.url`, so there are two vmalert Deployments: one pointed
+# at VictoriaLogs, one at VictoriaTraces. A rule put in the wrong ConfigMap does
+# not error and does not warn. It queries the wrong store, matches nothing, and
+# never fires — a rule that looks deployed and is not. If a rule reads log
+# lines, it belongs in `pilke-alert-rules-logs`; if it reads spans, in
+# `pilke-alert-rules-traces`.
+#
+# Both stores speak LogsQL, which is why every group here is `type: vlogs`
+# whether it is reading spans or log lines.
+#
+# The kindness in the other direction: vmalert reloads these without a restart,
+# unlike `pilke-config`, which needs the pods replaced. Committing a rule change
+# is the whole operation.
+#
+# ⚠️ A WRONG FIELD NAME IS SILENT, exactly like a rule in the wrong file. Every
+# expression below names fields that depend on what the SDKs actually send —
+# which semantic convention the Python instrumentation is using, what the
+# backend's log formatter emits. Confirm each one against a real record in
+# Grafana before believing a quiet rule means quiet weeks. `| stats count()`
+# with the filter pipe removed is the one-line way to check: it returns a number
+# rather than nothing, so it distinguishes "no matches" from "no such field".
+#
+# The evaluation window is the group's `interval`: vmalert appends
+# `_time:<interval>` to every expression by itself. That is why a rule that
+# wants a different window gets a different group rather than a hand-written
+# time filter.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pilke-alert-rules-traces
+  namespace: pilke
+data:
+  # =========================================================================
+  # VictoriaTraces. Field names follow its data model: resource attributes are
+  # `resource_attr:<name>`, span attributes `span_attr:<name>`, and the span's
+  # own OTLP status is the bare `status_code` (0 unset, 1 ok, 2 error). The
+  # names carry a colon, so LogsQL needs them quoted.
+  # =========================================================================
+  traces.yaml: |
+    groups:
+      # ---------------------------------------------------------------------
+      - name: pilke-api-errors
+        type: vlogs
+        interval: 5m
+        rules:
+          # THE ONE THAT MATTERS. Everything else here is a refinement of
+          # knowing that the API is answering.
+          - alert: PilkeApiServerErrors
+            # Both attribute names on purpose. The Python instrumentation emits
+            # `http.status_code` under the old semantic conventions and
+            # `http.response.status_code` under the stable ones, and which it
+            # uses depends on an opt-in environment variable that a dependency
+            # bump can change underneath this. Matching either costs nothing;
+            # matching the wrong one costs the alert.
+            expr: '"resource_attr:service.name":="pilke-api" AND ("span_attr:http.response.status_code":>=500 OR "span_attr:http.status_code":>=500) | stats count() as server_errors | filter server_errors:>0'
+            labels:
+              severity: critical
+            annotations:
+              summary: "pilke-api returned {{ $value }} server error(s) in the last 5 minutes"
+              description: >-
+                Open the VictoriaTraces datasource in Grafana and sort by
+                duration; the failing span carries its exception, and the log
+                lines for the same request are one click away by trace_id.
+
+      # ---------------------------------------------------------------------
+      - name: pilke-app-errors
+        type: vlogs
+        interval: 5m
+        rules:
+          # The client half: a JS exception that reached the global handler or
+          # the expo-router ErrorBoundary. The app reports these as a span with
+          # an exception event AND an error status, and the status is what is
+          # cheap to filter on — an event's attributes land in VictoriaTraces
+          # with an index suffix (`event:event_attr:exception.type:0`), which
+          # only matches if the exception happened to be the first event on the
+          # span. The status is on the span itself, so it always matches.
+          - alert: PilkeAppUnhandledError
+            expr: '"resource_attr:service.name":="pilke-app" AND status_code:=2 | stats count() as app_errors | filter app_errors:>0'
+            labels:
+              severity: warning
+            annotations:
+              summary: "pilke-app reported {{ $value }} unhandled error(s) in the last 5 minutes"
+              description: >-
+                A crash on a phone. The span carries the screen it happened on
+                and the app version; a release stack trace is minified, so
+                symbolicating it needs the source map EAS produced for that
+                build.
+
+      # ---------------------------------------------------------------------
+      - name: pilke-dead-mans-switch
+        type: vlogs
+        # Fifteen minutes, which is also this rule's whole lookback window. Long
+        # enough that a rolling deploy does not fire it, short enough that a
+        # Friday evening outage is noticed while people are still standing
+        # outside bars.
+        interval: 15m
+        rules:
+          # THE DEAD MAN'S SWITCH, and the reason this rule is written as a
+          # count rather than as an absence: an alerting engine that skips
+          # evaluation on an empty result set cannot express absence, and
+          # absence is the failure mode that matters here. A global `stats
+          # count()` in LogsQL returns one row holding zero when nothing
+          # matched, so `filter spans:<1` has something to fire on.
+          #
+          # ⚠️ THIS SWITCH DIES WITH THE CLUSTER. It reports that the API
+          # stopped sending; it cannot report that the cluster, the NAS or the
+          # ISP is gone, because it is inside all three. The external uptime
+          # check on https://api.pilke.app/healthz recorded in ../README.md is
+          # not replaced by this.
+          - alert: PilkeNoTelemetry
+            expr: '"resource_attr:service.name":="pilke-api" | stats count() as spans | filter spans:<1'
+            labels:
+              severity: critical
+            annotations:
+              summary: "No pilke-api spans arrived in 15 minutes"
+              description: >-
+                Either the API is down, or the collector is, or the exporter
+                stopped being configured. Check in that order: pods first,
+                `kubectl -n pilke logs deploy/otel-collector` second, and
+                whether OTEL_EXPORTER_OTLP_ENDPOINT survived the last rollout
+                third.
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pilke-alert-rules-logs
+  namespace: pilke
+data:
+  # =========================================================================
+  # VictoriaLogs. Fields here are flat: `service.name` and
+  # `deployment.environment` are the stream fields the collector pins, `_msg` is
+  # the line as written, and everything the backend's JSON formatter emits
+  # (`logger`, `level`, `trace_id`) is an ordinary field.
+  #
+  # ⚠️ BOTH RULES BELOW DEPEND ON A LOG LINE PHASE 1 HAS TO EMIT. The safety
+  # report line exists today; the abandoned-push line does not — abandonment is
+  # a column change in `notifications.receipts`, not a log. The rule and the
+  # line are one contract and they land together, or this file describes an
+  # alert that cannot fire.
+  # =========================================================================
+  logs.yaml: |
+    groups:
+      # ---------------------------------------------------------------------
+      - name: pilke-safety-reports
+        type: vlogs
+        # One minute. A person reported feeling unsafe; the interval is the
+        # window and the window is how late the phone can be.
+        interval: 1m
+        rules:
+          # `LoggingAdminAlertBackend` writes `ADMIN ALERT (<kind>) ...` at
+          # warning level, and that prefix is the whole match — the line
+          # deliberately says that words were written rather than quoting them,
+          # so there is nothing sensitive in what is matched or in what this
+          # alert carries.
+          #
+          # ⚠️ This does not make `reaches_an_admin` true. That flag is what
+          # entitles the app's copy to stop short of promising a person reads a
+          # report, and it stays False until treffit-backend#22 lands a real
+          # backend. This rule makes the report visible; it does not make the
+          # promise keepable.
+          - alert: PilkeSafetyReport
+            expr: '_msg:"ADMIN ALERT" | stats count() as reports | filter reports:>0'
+            labels:
+              severity: critical
+            annotations:
+              summary: "{{ $value }} admin alert(s) raised in the last minute"
+              description: >-
+                A safety report or another admin alert. The words are in the
+                database and deliberately not in the log line: open the row in
+                https://pilke.internal/admin/ rather than looking for detail
+                here.
+
+      # ---------------------------------------------------------------------
+      - name: pilke-push-delivery
+        type: vlogs
+        interval: 5m
+        rules:
+          # `notifications` is an outbox precisely so an undeliverable push is a
+          # row somebody can see rather than a message that silently never
+          # arrived. This is that row reaching a phone.
+          - alert: PilkePushUndeliverable
+            expr: 'logger:="treffit_backend.notifications.receipts" AND _msg:"abandoned" | stats count() as abandoned | filter abandoned:>0'
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $value }} push notification(s) were abandoned in the last 5 minutes"
+              description: >-
+                Expo confirmed a failure, so the row holds Expo's own words in
+                `last_error`. `manage.py send_notifications --requeue-abandoned`
+                is the re-arm once the cause is understood; requeueing a
+                deactivated token just abandons it again.

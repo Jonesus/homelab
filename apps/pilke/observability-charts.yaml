@@ -1,0 +1,505 @@
+# The four upstream charts of the telemetry stack, all of them into `pilke`.
+#
+# Every chart here is pinned to an exact version. Argo resolves `targetRevision`
+# against the repository at sync time, so a range would let a chart move without
+# a commit — and the names this stack is wired by (`vlsingle-pilke`,
+# `vtsingle-pilke`, `vmalertmanager-pilke-logs`) come out of chart templates.
+# Those names are written by hand into the collector config, the vmalert
+# datasource URLs and two Ingress objects, so a chart that renames a Service
+# breaks this quietly. Bump deliberately, one chart at a time.
+#
+# ⚠️ NOTHING HERE IS CLUSTER-SCOPED AND NOTHING HERE AUTHENTICATES. The two
+# stores accept any request that reaches them; `vmauth` is what would add a
+# credential and it is not deployed. That is safe only for as long as the only
+# routes in are a LAN-only Ingress on `internal-ca` and the collector. Do not
+# give any of these an `Ingress` on `letsencrypt-prod`.
+#
+# ⚠️ `useLegacyNaming: false` in the three VictoriaMetrics charts is load-bearing
+# rather than cosmetic. Left unset, those charts name a Service after the release
+# and the chart (`pilke-victoria-logs-single-server`); set false, they use the
+# short operator-style name (`vlsingle-pilke`) that the collector's exporters and
+# vmalert's datasource URLs are written against.
+
+# ---------------------------------------------------------------------------
+# VictoriaLogs. Service `vlsingle-pilke:9428`.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pilke-victoria-logs
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: pilke
+    server: https://kubernetes.default.svc
+  project: apps
+  source:
+    chart: victoria-logs-single
+    repoURL: https://victoriametrics.github.io/helm-charts/
+    targetRevision: 0.13.9
+    helm:
+      # The release name is half of every Service name this chart renders, so it
+      # is `pilke` and not `pilke-victoria-logs`: that is what makes the Service
+      # `vlsingle-pilke`. Argo renders with `helm template` and keeps no release
+      # state, so sharing the name with the VictoriaTraces Application below is
+      # not a collision.
+      releaseName: pilke
+      valuesObject:
+        useLegacyNaming: false
+
+        server:
+          # 30 days, and one retention covers everything the store holds. This
+          # is the number the privacy policy publishes, so it is a privacy
+          # control expressed as a flag — not a disk setting to tune when the
+          # volume fills. The chart's default is one month expressed as `1`,
+          # which is close enough to look correct and is not what was promised.
+          retentionPeriod: "30d"
+
+          persistentVolume:
+            enabled: true
+            # ⚠️ REQUIRED. There is no default StorageClass in this cluster, so
+            # a PVC that names no class stays Pending forever with nothing in
+            # the StatefulSet saying why. `iscsi` is democratic-csi against the
+            # TrueNAS box, the class garage and immich-postgres already run on.
+            # Not `qnap-iscsi`: no driver pods for it are running and nothing in
+            # the cluster uses it.
+            storageClassName: iscsi
+            # allowVolumeExpansion is true on this class, so this is a starting
+            # point rather than a commitment.
+            size: 20Gi
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+          # Both would create Prometheus-operator or VictoriaMetrics-operator
+          # custom resources. Neither operator is installed, there are no
+          # metrics in this deployment by design, and a CRD is cluster-scoped.
+          serviceMonitor:
+            enabled: false
+          vmServiceScrape:
+            enabled: false
+
+        # This chart can bring its own log collector as a subchart. It is a
+        # cluster-wide `kubernetes_logs` source with the RBAC that implies, and
+        # collecting this namespace only is the whole point of the DaemonSet in
+        # `observability/collector-agent.yaml`.
+        vector:
+          enabled: false
+
+        # VictoriaLogs' own operational dashboards read a Prometheus datasource
+        # for its self-metrics. There is none, so they would render empty panels
+        # in the Grafana below.
+        dashboards:
+          enabled: false
+
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+
+---
+# ---------------------------------------------------------------------------
+# VictoriaTraces. Service `vtsingle-pilke:10428`, and the Jaeger query API at
+# /select/jaeger is what Grafana reads it through.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pilke-victoria-traces
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: pilke
+    server: https://kubernetes.default.svc
+  project: apps
+  source:
+    chart: victoria-traces-single
+    repoURL: https://victoriametrics.github.io/helm-charts/
+    targetRevision: 0.1.11
+    helm:
+      releaseName: pilke
+      valuesObject:
+        useLegacyNaming: false
+
+        server:
+          # The same thirty days. Two stores, two flags, one published number:
+          # a trace kept longer than the log line beside it is a promise broken
+          # in the half nobody checks.
+          retentionPeriod: "30d"
+
+          persistentVolume:
+            enabled: true
+            storageClassName: iscsi
+            size: 20Gi
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+          serviceMonitor:
+            enabled: false
+          vmServiceScrape:
+            enabled: false
+
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+
+---
+# ---------------------------------------------------------------------------
+# vmalert, instance 1 of 2: the log rules, against VictoriaLogs. This is also
+# the instance that carries Alertmanager for both.
+#
+# ⚠️ Two instances is not a redundancy choice. vmalert takes exactly one
+# `-datasource.url`, and there are two stores. A rule filed against the wrong
+# instance does not error: it queries the wrong store, matches nothing, and
+# never fires. The two rule ConfigMaps in `observability/alert-rules.yaml` are
+# named for their store for that reason.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pilke-vmalert-logs
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: pilke
+    server: https://kubernetes.default.svc
+  project: apps
+  source:
+    chart: victoria-metrics-alert
+    repoURL: https://victoriametrics.github.io/helm-charts/
+    targetRevision: 0.47.0
+    helm:
+      # Renders vmalert as `vmalert-pilke-logs` and Alertmanager as
+      # `vmalertmanager-pilke-logs`, which is the notifier address the traces
+      # instance below is pointed at.
+      releaseName: pilke-logs
+      valuesObject:
+        useLegacyNaming: false
+
+        # vmalert reads its rules from a file and its data over HTTP. It asks
+        # the Kubernetes API nothing, so it gets no ServiceAccount of its own.
+        serviceAccount:
+          create: false
+
+        server:
+          datasource:
+            # LogsQL over the stats API. VictoriaLogs is the datasource for the
+            # two rules that read log lines.
+            url: http://vlsingle-pilke:9428
+
+          # The rules live in git, in a ConfigMap this chart mounts at /config
+          # rather than one it renders from values — so a rule change is a
+          # one-file diff and vmalert reloads it without a restart, unlike
+          # `pilke-config`, which needs the pods replaced.
+          configMap: pilke-alert-rules-logs
+
+          extraArgs:
+            envflag.enable: true
+            envflag.prefix: VM_
+            loggerFormat: json
+            # A glob, so adding a second rules file to the ConfigMap needs no
+            # change here. The chart's mount point is /config and is not
+            # configurable.
+            rule:
+              - /config/*.yaml
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+
+        # One Alertmanager for both vmalert instances: grouping only helps if
+        # every alert passes through the same one, and a silence set here has to
+        # cover the trace rules as well as these.
+        alertmanager:
+          enabled: true
+
+          # Silences and the notification log live here. On an emptyDir they do
+          # not survive a restart, which is the honest trade for keeping this
+          # namespace at the two PVCs the stores need: a lost silence is a
+          # notification you have already seen, and a lost notification log is
+          # at worst one repeat.
+          persistentVolume:
+            enabled: false
+
+          config:
+            global:
+              resolve_timeout: 5m
+            route:
+              receiver: home-assistant
+              # One notification per alertname per deploy, not one per firing
+              # series. This is the whole reason Alertmanager is here rather
+              # than vmalert calling a webhook itself.
+              group_by: ["alertname"]
+              group_wait: 30s
+              group_interval: 5m
+              repeat_interval: 12h
+            receivers:
+              - name: home-assistant
+                webhook_configs:
+                  # In-cluster, so this adds no processor, no SMTP credential
+                  # and no third party. Home Assistant turns the POST into a
+                  # push notification on the phone.
+                  #
+                  # ⚠️ THE WEBHOOK ID IS THE ENTIRE CREDENTIAL. Home Assistant
+                  # authenticates a webhook by nothing but its id, and Home
+                  # Assistant is also published at hassio.boiss.it — so a
+                  # guessable id here is a publicly writable alert channel.
+                  # Create the automation in Home Assistant with a generated
+                  # id and put that id here before this file is committed;
+                  # `pilke-alerts-REPLACE-ME` is not an id, it is a reminder.
+                  - url: http://home-assistant.homeassistant.svc.cluster.local:8080/api/webhook/pilke-alerts-REPLACE-ME
+                    # A page that is down cannot be told it is up again. Sending
+                    # resolutions is what makes "it recovered on its own" a
+                    # thing the phone says rather than something you find out by
+                    # checking.
+                    send_resolved: true
+
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+        serviceMonitor:
+          enabled: false
+
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+
+---
+# ---------------------------------------------------------------------------
+# vmalert, instance 2 of 2: the trace rules, against VictoriaTraces. No
+# Alertmanager of its own — it notifies the one above.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pilke-vmalert-traces
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: pilke
+    server: https://kubernetes.default.svc
+  project: apps
+  source:
+    chart: victoria-metrics-alert
+    repoURL: https://victoriametrics.github.io/helm-charts/
+    targetRevision: 0.47.0
+    helm:
+      releaseName: pilke-traces
+      valuesObject:
+        useLegacyNaming: false
+
+        serviceAccount:
+          create: false
+
+        server:
+          datasource:
+            # VictoriaTraces answers LogsQL over the same stats API shape as
+            # VictoriaLogs, which is why one rule format covers spans and log
+            # lines alike and why these rules are also `type: vlogs`.
+            url: http://vtsingle-pilke:10428
+
+          configMap: pilke-alert-rules-traces
+
+          notifier:
+            # The Alertmanager the logs instance renders. Named explicitly
+            # because with `alertmanager.enabled: false` this chart has nothing
+            # to discover.
+            url: http://vmalertmanager-pilke-logs:9093
+
+          extraArgs:
+            envflag.enable: true
+            envflag.prefix: VM_
+            loggerFormat: json
+            rule:
+              - /config/*.yaml
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+
+        # A second Alertmanager would group against its own state, so one bad
+        # deploy would notify twice and a silence would only ever cover half the
+        # rules.
+        alertmanager:
+          enabled: false
+
+        serviceMonitor:
+          enabled: false
+
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+
+---
+# ---------------------------------------------------------------------------
+# Grafana. Service `pilke-grafana:80`, reached at pilke-o11y.internal through
+# `observability/ingress-grafana.yaml`.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pilke-grafana
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: pilke
+    server: https://kubernetes.default.svc
+  project: apps
+  source:
+    chart: grafana
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: 10.5.15
+    helm:
+      releaseName: pilke
+      valuesObject:
+        # ⚠️ Installed at pod start with grafana-cli, so this pod needs egress
+        # to grafana.com to become ready. VictoriaTraces needs no plugin — it
+        # speaks the Jaeger query API, which Grafana ships with — so this list
+        # is the logs half only.
+        plugins:
+          - victoriametrics-logs-datasource
+
+        datasources:
+          datasources.yaml:
+            apiVersion: 1
+            datasources:
+              # Traces. `/select/jaeger` is VictoriaTraces' Jaeger-compatible
+              # query surface; the datasource type is Grafana's own.
+              - name: VictoriaTraces
+                uid: victoriatraces
+                type: jaeger
+                access: proxy
+                url: http://vtsingle-pilke:10428/select/jaeger
+                isDefault: true
+                jsonData:
+                  # The trace-to-logs click, which is the fastest move in the
+                  # triage workflow: from a span, run a LogsQL query for the
+                  # same trace against the logs datasource. `trace_id` is the
+                  # field name the backend's log formatter must emit — the
+                  # instrumentation's own name is `otelTraceID`, and the
+                  # collector renames it. Get that wrong and nothing breaks
+                  # visibly: the traces arrive, the logs arrive, and this link
+                  # silently returns nothing.
+                  tracesToLogsV2:
+                    datasourceUid: victorialogs
+                    spanStartTimeShift: -5m
+                    spanEndTimeShift: 5m
+                    filterByTraceID: false
+                    customQuery: true
+                    query: 'trace_id:="$${__span.traceId}"'
+
+              # Logs.
+              - name: VictoriaLogs
+                uid: victorialogs
+                type: victoriametrics-logs-datasource
+                access: proxy
+                url: http://vlsingle-pilke:9428
+
+        # Dashboards arrive as ConfigMaps carrying the `grafana_dashboard`
+        # label, which this sidecar watches for. `searchNamespace` is left unset
+        # so it watches its own namespace only — the alternative is a ClusterRole
+        # to watch every namespace, and this stack holds no cluster-scoped
+        # object at all.
+        sidecar:
+          dashboards:
+            enabled: true
+            label: grafana_dashboard
+            labelValue: "1"
+
+        # A Role and RoleBinding over configmaps and secrets in this namespace,
+        # which is what the sidecar above needs. `namespaced: true` is what keeps
+        # it from being a ClusterRole.
+        rbac:
+          create: true
+          namespaced: true
+          pspEnabled: false
+
+        # ⚠️ NO LOGIN, DELIBERATELY, and it is the same decision as the stores
+        # having no authentication. This Grafana reads two unauthenticated
+        # in-cluster stores and is reachable only through an `internal-ca`
+        # Ingress on the LAN. A login form here would be a password committed to
+        # git guarding a door that opens onto an open room. The control is that
+        # `pilke-o11y.internal` does not resolve or route from the internet — so
+        # if that ever stops being true, this is the line that has to change
+        # first.
+        grafana.ini:
+          auth.anonymous:
+            enabled: true
+            org_role: Admin
+          auth:
+            disable_login_form: true
+          analytics:
+            reporting_enabled: false
+            check_for_updates: false
+          users:
+            default_theme: dark
+
+        # No PVC. Everything Grafana needs is provisioned from this file and
+        # from dashboard ConfigMaps in git, so its own database holds nothing
+        # that is not reproducible — and an explore query is not state.
+        persistence:
+          enabled: false
+
+        # The chart's own ingress stays off: the Ingress lives in
+        # `observability/ingress-grafana.yaml` beside the other two, where the
+        # cert-manager and nginx annotations of this repo are.
+        ingress:
+          enabled: false
+
+        testFramework:
+          enabled: false
+
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

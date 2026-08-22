@@ -27,5 +27,7 @@ resources:
   - garage/prerequisites.yaml
   - pilke/app.yaml
   - pilke/prerequisites.yaml
+  - pilke/observability.yaml
+  - pilke/observability-charts.yaml
   - backup-photos/app.yaml
   - internal-ingresses/app.yaml
