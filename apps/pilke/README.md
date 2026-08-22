@@ -225,12 +225,16 @@ restore-from-dump, not `git revert`.
   detaches and reattaches.
 - **One NAS.** The database volume, Garage's volume and the backups are all on
   it. This protects against a bad migration, not against losing the box.
-- **No monitoring.** "The outbox stopped draining" is discoverable only by
-  reading task results in the admin, and "the API is down" only by a user
-  saying so. The cheapest fix is an **external** uptime check on
-  `https://api.pilke.app/healthz` — external because when the ISP is down,
-  anything in-cluster is down with it — plus a dead-man's-switch ping from the
-  backup CronJob, since a silently failing backup is how backups actually fail.
+- **No monitoring from outside the cluster.** Telemetry itself is here —
+  `observability.yaml` and `observability-charts.yaml` deploy VictoriaLogs,
+  VictoriaTraces, Grafana at `pilke-o11y.internal` and five alert rules that
+  reach a phone through Alertmanager and Home Assistant. What none of it can do
+  is report on losing the thing it runs on: its volumes are on the same NAS as
+  the database, its dead man's switch dies with the cluster, and when the ISP is
+  down so is every part of it. So the **external** uptime check on
+  `https://api.pilke.app/healthz` is still owed, plus a dead-man's-switch ping
+  from the backup CronJob, since a silently failing backup is how backups
+  actually fail.
 - **No offsite copy**, and no answer yet on whether the disks are encrypted at
   rest. The second one changes what the privacy statement can honestly claim.
 

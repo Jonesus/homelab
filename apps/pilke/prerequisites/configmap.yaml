@@ -105,6 +105,56 @@ data:
   # cannot drive. Local and CI keep `RecordingSmsBackend`.
   SMS_BACKEND: "treffit_backend.notifications.sms.GatewayApiSmsBackend"
 
+  # --- Telemetry -----------------------------------------------------------
+  #
+  # `treffit_backend/telemetry.py` is a no-op when OTEL_EXPORTER_OTLP_ENDPOINT
+  # is unset, and that is what keeps `make test`, the Maestro suite's backend and
+  # every developer's laptop silent by default. Setting it here is what turns it
+  # on, for this environment only.
+  #
+  # The collector, not either store. The stores have no authentication at all, so
+  # they are never addressed directly; the collector is where redaction happens,
+  # where the client address is dropped, and where the disk-backed queue makes a
+  # store restart a delay rather than a gap.
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.pilke.svc.cluster.local:4318"
+
+  # http/protobuf, because that is the exporter the image installs — the OTLP
+  # gRPC exporter is a separate package and is not a dependency. Left unset the
+  # SDK defaults to gRPC, tries port 4317, and every export fails with a
+  # connection error that reads like a network problem.
+  OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+
+  # No sampling. At a few hundred spans a minute, sampling only ever costs you
+  # the trace you went looking for. `parentbased` is the part that matters when
+  # the app starts sending: a request that begins with a tap on a phone arrives
+  # carrying `traceparent`, and this is what makes the server side of it join
+  # that trace instead of starting a new one.
+  OTEL_TRACES_SAMPLER: "parentbased_always_on"
+
+  # The route on the request span, which is what makes "which endpoint is slow"
+  # answerable. Deliberately `path_info` and nothing else: the Django
+  # instrumentation can attach any request attribute, and `META` would put
+  # headers — Authorization included — on every span. The collector templates
+  # the ids out of this path and drops the full URL.
+  OTEL_PYTHON_DJANGO_TRACED_REQUEST_ATTRS: "path_info"
+
+  # ⚠️ Both exporters off, and both are load-bearing. `pilke-worker` and
+  # `pilke-scheduler` start under `opentelemetry-instrument`, which configures a
+  # metrics exporter AND a logs exporter by default — so left unset, those two
+  # processes would ship metrics this deployment does not collect, and would ship
+  # logs through `opentelemetry.sdk._logs`, which is the experimental API the
+  # whole stdout-plus-filelog design exists to avoid. Both would go to the
+  # collector's OTLP port and be accepted. `pilke-api` does not read these (its
+  # provider is built by hand in `telemetry.py`), and it costs nothing for it to.
+  OTEL_METRICS_EXPORTER: "none"
+  OTEL_LOGS_EXPORTER: "none"
+
+  # ⚠️ OTEL_SERVICE_NAME IS NOT HERE, AND MUST NOT BE. Three Deployments read
+  # this one ConfigMap and need three different names, so it is set in each
+  # Deployment's own `env:`. Put it here and all three processes appear as one
+  # service: the API's error rate, the worker's and the scheduler's added
+  # together, with no way to tell afterwards which was which.
+
   # ADMIN_ALERT_BACKEND stays unset: only the logging default exists, and it
   # reports reaches_an_admin = False. That flag is what entitles the app's copy
   # to stop short of promising a person reads a safety report, so setting this

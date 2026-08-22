@@ -36,14 +36,43 @@ spec:
         - name: ghcr-pull
       containers:
         - name: scheduler
-          image: ghcr.io/boissit/treffit-backend:sha-e7c809e
-          command: ["python", "manage.py", "run_scheduler"]
+          # ⚠️ THIS TAG AND THE COMMAND BELOW ARE ONE CHANGE. The command names
+          # `opentelemetry-instrument`, which is on PATH only in an image built
+          # from the commit that added `opentelemetry-distro` to the backend's
+          # dependencies. Bump this tag in the same commit that changes the
+          # command, or the container exits with "executable file not found".
+          # CI does not build this image — see ../README.md and
+          # treffit-backend/docs/releasing.md.
+          image: ghcr.io/boissit/treffit-backend:sha-6caf626
+          # `opentelemetry-instrument` is the zero-code path, and it is the
+          # simplest correct one here because this process does not fork. The
+          # API cannot use it: gunicorn forks, and a `BatchSpanProcessor` built
+          # before the fork deadlocks the worker, so that Deployment initialises
+          # telemetry in `post_fork` instead.
+          command: ["opentelemetry-instrument", "python", "manage.py", "run_scheduler"]
           envFrom:
             - configMapRef:
                 name: pilke-config
             - secretRef:
                 name: pilke-app-secrets
           env:
+            # ⚠️ HERE AND NOT IN `pilke-config`. Three Deployments share that
+            # ConfigMap and need three different names; set it there and all
+            # three processes arrive as one service. The name also has to match
+            # what the log pipeline derives from the container name, `pilke-`
+            # plus `scheduler`, or a span and the log line beside it look like two
+            # different services.
+            - name: OTEL_SERVICE_NAME
+              value: pilke-scheduler
+            # The image's own revision, handed back to the process that is running
+            # it. Nothing inside a container can read its own OCI labels, so
+            # `service.version` on every span comes from here or not at all — and
+            # without it "which build broke" is a question the traces cannot
+            # answer. It has to be bumped with `image:` above; the two are one
+            # edit, and a stale value here is worse than an absent one because it
+            # attributes a new build's errors to an old release.
+            - name: SERVICE_VERSION
+              value: sha-6caf626
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:

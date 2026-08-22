@@ -35,13 +35,32 @@ spec:
         - name: ghcr-pull
       containers:
         - name: api
-          image: ghcr.io/boissit/treffit-backend:sha-e7c809e
+          # ⚠️ THIS TAG AND THE COMMAND BELOW ARE ONE CHANGE. The command names
+          # `gunicorn.conf.py`, which exists only in an image built from the
+          # commit that added telemetry to the backend. Bump this tag in the same
+          # commit that changes the command, or gunicorn exits immediately with
+          # a config file it cannot find and the API is down. CI does not build
+          # this image — see ../README.md and treffit-backend/docs/releasing.md.
+          image: ghcr.io/boissit/treffit-backend:sha-6caf626
           # The Dockerfile's CMD takes gunicorn's default of **one** worker,
           # which is one request at a time per pod. Fine for `docker compose` on
           # a laptop and not for the only API a beta has. Sync workers: reads of
           # photographs never reach this process, and an upload is one PUT.
           command:
             - gunicorn
+            # ⚠️ `-c gunicorn.conf.py` IS WHAT KEEPS THIS PROCESS FROM HANGING,
+            # not a tidier way to pass options. That file's `post_fork` is where
+            # telemetry is initialised, and it has to be after the fork:
+            # OpenTelemetry's `BatchSpanProcessor` starts a background thread,
+            # which is not fork-safe, so a provider built in the master process
+            # leaves each worker holding an inherited lock. The symptom is a
+            # worker that hangs on its first request rather than an error, so
+            # nothing in the logs points at this.
+            #
+            # The file lives at /app/gunicorn.conf.py in the image, which is the
+            # working directory, so the bare name resolves.
+            - -c
+            - gunicorn.conf.py
             - treffit_backend.wsgi:application
             - --bind
             - 0.0.0.0:8000
@@ -53,6 +72,23 @@ spec:
             - secretRef:
                 name: pilke-app-secrets
           env:
+            # ⚠️ HERE AND NOT IN `pilke-config`. Three Deployments share that
+            # ConfigMap and need three different names; set it there and the
+            # API, the worker and the scheduler arrive as one service with
+            # their error rates added together. The name also has to match what
+            # the log pipeline derives from the container name, `pilke-` plus
+            # `api`, or the trace-to-logs click lands nowhere.
+            - name: OTEL_SERVICE_NAME
+              value: pilke-api
+            # The image's own revision, handed back to the process that is running
+            # it. Nothing inside a container can read its own OCI labels, so
+            # `service.version` on every span comes from here or not at all — and
+            # without it "which build broke" is a question the traces cannot
+            # answer. It has to be bumped with `image:` above; the two are one
+            # edit, and a stale value here is worse than an absent one because it
+            # attributes a new build's errors to an old release.
+            - name: SERVICE_VERSION
+              value: sha-6caf626
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
