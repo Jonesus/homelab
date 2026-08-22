@@ -266,12 +266,18 @@ spec:
                   #
                   # ⚠️ THE WEBHOOK ID IS THE ENTIRE CREDENTIAL. Home Assistant
                   # authenticates a webhook by nothing but its id, and Home
-                  # Assistant is also published at hassio.boiss.it — so a
-                  # guessable id here is a publicly writable alert channel.
-                  # Create the automation in Home Assistant with a generated
-                  # id and put that id here before this file is committed;
-                  # `pilke-alerts-REPLACE-ME` is not an id, it is a reminder.
-                  - url: http://home-assistant.homeassistant.svc.cluster.local:8080/api/webhook/pilke-alerts-REPLACE-ME
+                  # Assistant is also published at hassio.boiss.it — so whoever
+                  # guesses this id can post alerts into the automation behind
+                  # it. This one is a chosen name rather than a generated
+                  # secret, which is a deliberate trade: the blast radius is a
+                  # false notification on a phone, not access to anything. If
+                  # that trade stops being acceptable, the fix is a generated id
+                  # here and in the automation, not a second mechanism.
+                  #
+                  # It is also the reason nothing in the alert payload should
+                  # ever carry more than an alert name and a link: this endpoint
+                  # is writable by strangers, so treat what it emits as public.
+                  - url: http://home-assistant.homeassistant.svc.cluster.local:8080/api/webhook/pilke-alerts-hassio
                     # A page that is down cannot be told it is up again. Sending
                     # resolutions is what makes "it recovered on its own" a
                     # thing the phone says rather than something you find out by
