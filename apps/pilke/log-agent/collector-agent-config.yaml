@@ -120,11 +120,41 @@ data:
       transform:
         error_mode: ignore
         log_statements:
-          # The container name is `api`, `worker` or `scheduler`; the traces from
-          # the same process arrive as `pilke-api` and so on from
-          # OTEL_SERVICE_NAME. They have to agree, or a service looks like two
-          # services and the trace-to-logs click lands nowhere.
-          - set(resource.attributes["service.name"], Concat(["pilke", resource.attributes["k8s.container.name"]], "-")) where resource.attributes["k8s.container.name"] != nil
+          # ⚠️ `service.name` IS A STREAM FIELD, SO THE SET OF VALUES BELOW IS
+          # THE STREAM COUNT. The gateway ships to VictoriaLogs with
+          # `VL-Stream-Fields: service.name,deployment.environment` — the header
+          # is in `../observability/collector-config.yaml`, not here — and a
+          # stream in that store is permanent: every distinct value ever sent
+          # stays in the index whether or not anything still writes it. So this
+          # value comes from a closed set spelt out here and never from the
+          # container name, which is open: the namespace holds Grafana,
+          # VictoriaLogs and vmalert beside the application, and any `kubectl
+          # run` debugging pod adds one more. A name derived from the container
+          # mints a stream per throwaway pod that nothing can take back.
+          #
+          # A default first and then the three overrides. Statements run in
+          # order, so the last one that matches wins and every container not
+          # named below keeps the default — four literals in, at most four
+          # values out, for any input.
+          #
+          # ⚠️ THE THREE LITERALS ARE THE `OTEL_SERVICE_NAME` VALUES ON
+          # `../app/deployment-api.yaml`, `-worker` AND `-scheduler`. Traces
+          # from those same processes arrive under those names and the
+          # trace-to-logs click joins on `service.name`, so a spelling that
+          # differs by one character makes one service look like two and the
+          # click lands nowhere. Both sides change together or neither does.
+          #
+          # `pilke-other` and not `pilke-infra`, because a debugging pod lands
+          # here too and is not infrastructure; the name has to stay true for
+          # whatever turns up in the namespace. It costs no information: every
+          # record still carries `k8s.container.name`, and the gateway's header
+          # names two stream fields and not that one, so it arrives as an
+          # ordinary field — free of cardinality cost and still filterable when
+          # the question is which container a line came from.
+          - set(resource.attributes["service.name"], "pilke-other")
+          - set(resource.attributes["service.name"], "pilke-api") where resource.attributes["k8s.container.name"] == "api"
+          - set(resource.attributes["service.name"], "pilke-worker") where resource.attributes["k8s.container.name"] == "worker"
+          - set(resource.attributes["service.name"], "pilke-scheduler") where resource.attributes["k8s.container.name"] == "scheduler"
           # The second of the two stream fields. Constant here because this
           # cluster is the production one; it exists so the field is present and
           # low-cardinality rather than absent.
