@@ -132,6 +132,23 @@ data:
           # an answer rather than ten thousand distinct paths.
           - replace_pattern(span.attributes["url.path"], "/matches/[0-9]+", "/matches/{id}")
           - replace_pattern(span.attributes["url.path"], "/users/[0-9]+", "/users/{id}")
+          # ⚠️ THE QUERY STRING GOES FIRST, BEFORE ANY OTHER RULE TOUCHES THIS KEY.
+          # `http.target` is path AND query. `url.query` and `url.full` are deleted
+          # above, but this attribute is the one the Django instrumentation actually
+          # sets, and it carries everything after the `?` with it.
+          #
+          # GET /api/activities/nearby takes `longitude` and `latitude` as bare query
+          # parameters, and the handler's own docstring calls that point "somewhere the
+          # user is considering". The area picker calls it as it is panned. So without
+          # this line every pan writes a coordinate into a store that keeps it for
+          # thirty days -- while the privacy statement says the pipeline refuses
+          # coordinates, and section 4.3 audits four separate promises about location.
+          #
+          # It is a truncation and not a redaction on purpose: a value is never worth
+          # inspecting to decide whether to keep it. The route is already on the span as
+          # `http.route`, so nothing of diagnostic worth is lost.
+          - replace_pattern(span.attributes["http.target"], "\\?.*$", "")
+          - replace_pattern(span.attributes["url.path"], "\\?.*$", "")
           - replace_pattern(span.attributes["http.target"], "/matches/[0-9]+", "/matches/{id}")
           - replace_pattern(span.attributes["http.target"], "/users/[0-9]+", "/users/{id}")
 
