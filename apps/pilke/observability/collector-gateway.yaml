@@ -130,6 +130,16 @@ spec:
 # not free to change: the three application Deployments resolve it at runtime
 # and the agent DaemonSet exports to it.
 #
+# ⚠️ ONE OF THOSE CONSUMERS IS IN ANOTHER NAMESPACE. The agent is in
+# `pilke-logs` and reaches this Service as
+# `otel-collector.pilke.svc.cluster.local`, written out in
+# `../log-agent/collector-agent-config.yaml` — a file no diff of this directory
+# will show you. Renaming this Service, or moving it, breaks a caller that is
+# not visible from here, and the symptom is node logs quietly stopping while
+# traces keep arriving. Nothing gates that traffic today: there is no
+# NetworkPolicy in this namespace, and a default-deny added here would cut the
+# same path with the same silent symptom.
+#
 # OTLP/HTTP only. No gRPC port, because nothing here speaks gRPC — the Python
 # exporter is the proto-http one and the JS exporter has no choice — and an open
 # port is a thing to reason about.

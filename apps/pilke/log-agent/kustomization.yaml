@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Configuration before the workload that mounts it, so a first sync does not
+  # start the agent against a ConfigMap that does not exist yet. Argo applies a
+  # kustomize build in dependency-free order, so this is a reading order rather
+  # than a guarantee — the agent crash-loops for a few seconds and recovers if
+  # it goes the other way.
+  - collector-agent-config.yaml
+  - collector-agent.yaml
+
+# ⚠️ NO ServiceAccount, NO Role, NO RoleBinding, NO ClusterRole, AND NOTHING
+# THAT WOULD NEED ONE. The agent gets pod, namespace and container out of the
+# log filename with a regex precisely so that it never has to ask the API
+# server; the `k8sattributes` processor that reads the same three facts from the
+# Kubernetes API is the thing being avoided, and it needs cluster-wide list on
+# pods to do it. This pod runs under `default` and that ServiceAccount is bound
+# to nothing.
+#
+# ⚠️ The privileged PodSecurity level on this namespace does not soften that.
+# PodSecurity governs what a pod may ask the kubelet for — hostPath, host
+# namespaces, capabilities — and has no bearing on what it may ask the API
+# server for. Adding RBAC here would be a separate decision with none of the
+# same reasoning behind it.
+#
+# ⚠️ NO `Namespace` OBJECT EITHER. `../log-agent.yaml` creates this namespace
+# and owns its labels through `syncPolicy.managedNamespaceMetadata`. A Namespace
+# declared here is a second writer of the same metadata, and the failure it
+# produces is the original one — every pod rejected for its hostPath volumes —
+# with the labels apparently set in git.
+
+namespace: pilke-logs

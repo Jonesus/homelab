@@ -29,5 +29,6 @@ resources:
   - pilke/prerequisites.yaml
   - pilke/observability.yaml
   - pilke/observability-charts.yaml
+  - pilke/log-agent.yaml
   - backup-photos/app.yaml
   - internal-ingresses/app.yaml

@@ -1,0 +1,179 @@
+# The agent's pipeline, and the whole of its scope.
+#
+# ⚠️ EDITING THIS FILE CHANGES NOTHING UNTIL THE PODS ARE REPLACED. The
+# DaemonSet mounts it as a file and reads it once at startup, and Argo does not
+# roll a workload because a ConfigMap it mounts changed:
+#
+#     kubectl -n pilke-logs rollout restart ds/otel-collector-agent
+#
+# ⚠️ THE OTHER HALF OF THIS DESIGN IS IN `../observability/collector-config.yaml`
+# and the two only make sense read together. The agent exports to the gateway
+# rather than to a store, so the gateway's `redaction` processor is what covers
+# container stdout — the one place PII actually leaks — and none of that is
+# visible from this file. A reader who finds only this one sees a log shipper
+# with no privacy defence at all.
+#
+# The name differs from the gateway's `otel-collector-config` on purpose. Two
+# ConfigMaps with one name in two namespaces are one forgotten `-n` away from an
+# edit that lands on the wrong pipeline and appears to do nothing.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-agent-config
+  namespace: pilke-logs
+data:
+  agent.yaml: |
+    receivers:
+      filelog:
+        # THIS GLOB IS THE SCOPE, and it is the only scope there is. Kubernetes
+        # names the file <pod>_<namespace>_<container>-<id>.log, so a namespace
+        # filter is a filename filter and it applies before a line is ever read.
+        #
+        # `_pilke_` is a literal with the separators included, which is also
+        # what keeps this agent out of its own input: its pod's file is named
+        # `..._pilke-logs_...` and does not match. ⚠️ A namespace whose name is
+        # exactly `pilke` is the only thing this reads — anything wider is a
+        # change to this line and to nothing else, so a widened glob is not
+        # visible in a diff of any other file.
+        include:
+          - /var/log/containers/*_pilke_*.log
+        exclude:
+          # The gateway is in `pilke` and inside the glob above, so without this
+          # the agent reads the gateway's log, ships it to the gateway, which
+          # logs having received it — a loop bounded only by the rate limit. Its
+          # logs are still there for `kubectl logs`, which is where you would
+          # look for them anyway.
+          - /var/log/containers/otel-collector-*_pilke_*.log
+
+        # Everything already on disk when this starts is history that was never
+        # collected, and replaying weeks of it on first sync would be the
+        # store's first impression of itself.
+        start_at: end
+
+        # Where the read offsets live. Without it a restart re-reads from
+        # `start_at` and loses whatever arrived while the pod was down.
+        storage: file_storage
+
+        include_file_path: true
+        include_file_name: false
+        retry_on_failure:
+          enabled: true
+
+        operators:
+          # Unwraps the container runtime's envelope — the
+          # `2026-08-22T… stdout F …` prefix that containerd and CRI-O write
+          # around every line — and leaves the application's own line as the
+          # body.
+          #
+          # `add_metadata_from_filepath: false` because this operator's path
+          # regex only understands the /var/log/pods/ layout, and the glob above
+          # is deliberately the /var/log/containers/ one. The next operator does
+          # that job against the filename this DaemonSet actually reads.
+          - type: container
+            id: runtime-envelope
+            add_metadata_from_filepath: false
+
+          # Pod, namespace and container come out of the path with a regex.
+          #
+          # THE ALTERNATIVE IS THE k8sattributes PROCESSOR, WHICH READS THE SAME
+          # THREE FACTS FROM THE KUBERNETES API and needs a ClusterRole to list
+          # pods across namespaces to do it. This reads a filename. It holds no
+          # Kubernetes permissions at all, which is as close as a DaemonSet gets
+          # to being namespace-scoped.
+          - type: regex_parser
+            id: metadata-from-filename
+            parse_from: attributes["log.file.path"]
+            regex: '^/var/log/containers/(?P<pod>[^_]+)_(?P<namespace>[^_]+)_(?P<container>.+)-[0-9a-f]+\.log$'
+
+          # Onto the resource, not the record: these describe where the line came
+          # from rather than what it says, and the exporters' stream-field header
+          # is what keeps them from each becoming a stream.
+          - type: move
+            from: attributes.pod
+            to: resource["k8s.pod.name"]
+          - type: move
+            from: attributes.namespace
+            to: resource["k8s.namespace.name"]
+          - type: move
+            from: attributes.container
+            to: resource["k8s.container.name"]
+
+          # In production the backend's console handler writes JSON, so the
+          # fields are parsed rather than guessed at. The guard matters: the
+          # migration Job, gunicorn's own startup lines and anything that
+          # crashes before logging is configured are plain text, and a parser
+          # that fails on them would drop exactly the lines you need when a pod
+          # will not start.
+          - type: json_parser
+            id: application-json
+            parse_from: body
+            if: 'body matches "^\\s*\\{"'
+            on_error: send
+
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 25
+
+      transform:
+        error_mode: ignore
+        log_statements:
+          # The container name is `api`, `worker` or `scheduler`; the traces from
+          # the same process arrive as `pilke-api` and so on from
+          # OTEL_SERVICE_NAME. They have to agree, or a service looks like two
+          # services and the trace-to-logs click lands nowhere.
+          - set(resource.attributes["service.name"], Concat(["pilke", resource.attributes["k8s.container.name"]], "-")) where resource.attributes["k8s.container.name"] != nil
+          # The second of the two stream fields. Constant here because this
+          # cluster is the production one; it exists so the field is present and
+          # low-cardinality rather than absent.
+          - set(resource.attributes["deployment.environment"], "prod")
+
+      batch:
+        send_batch_size: 1024
+        timeout: 5s
+
+    extensions:
+      # A hostPath, unlike the gateway's: read offsets are per-node state and
+      # they are the one thing here that must outlive the pod. Losing them
+      # re-reads or skips a node's log tail.
+      file_storage:
+        directory: /var/lib/otelcol-agent
+
+      health_check:
+        endpoint: 0.0.0.0:13133
+
+    exporters:
+      # THROUGH THE GATEWAY, NOT STRAIGHT TO THE STORE. Container stdout is
+      # where PII leaks in practice — a stray log of a response body puts
+      # profiles and phone numbers on disk — so the agent's output goes through
+      # the same `redaction` processor as everything else, and only the gateway
+      # knows the stores' addresses.
+      #
+      # ⚠️ A CROSS-NAMESPACE ADDRESS, AND SO A FULLY QUALIFIED ONE. A bare
+      # `otel-collector` resolves against this pod's own search domains, finds
+      # no such Service in `pilke-logs`, and every export fails DNS — which
+      # reads in the agent's log as the gateway being down. Nothing here may be
+      # named `otel-collector` either: a local Service of that name would
+      # resolve first and swallow the whole log stream.
+      #
+      # `logs_endpoint` with the full path here too, for the same reason as in
+      # the gateway: the key that appends a path for you is the one that 404s.
+      otlphttp/gateway:
+        logs_endpoint: http://otel-collector.pilke.svc.cluster.local:4318/v1/logs
+        sending_queue:
+          enabled: true
+          storage: file_storage
+        retry_on_failure:
+          enabled: true
+
+    service:
+      extensions: [file_storage, health_check]
+      telemetry:
+        logs:
+          level: info
+      pipelines:
+        logs:
+          receivers: [filelog]
+          processors: [memory_limiter, transform, batch]
+          exporters: [otlphttp/gateway]

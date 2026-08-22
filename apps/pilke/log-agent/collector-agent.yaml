@@ -1,5 +1,5 @@
-# Container stdout for this namespace's three Deployments, and nothing else in
-# the cluster.
+# Container stdout for the three Deployments in `pilke`, and nothing else in the
+# cluster.
 #
 # ⚠️ A DAEMONSET IS THE ONE THING IN THIS STACK THAT CANNOT BE
 # NAMESPACE-SCOPED. It runs on every node and mounts the host's log directory,
@@ -10,15 +10,20 @@
 # Deployments over a shared emptyDir: genuinely namespace-scoped, and three more
 # containers inside the application's own manifests.
 #
-# What makes the scope real is in `collector-config.yaml`: the include glob is
-# `*_pilke_*.log`, and the namespace is part of the filename, so the filter
-# applies before a line is ever read. Verify it by looking at what arrived, not
-# by re-reading the pattern.
+# It reads `pilke` from outside `pilke`, because the hostPath volumes below are
+# forbidden by the PodSecurity level that namespace runs under and must keep
+# running under. `../log-agent.yaml` sets the level here and holds the whole of
+# that argument; read it before adding a second workload to this namespace.
+#
+# What makes the scope real is in `collector-agent-config.yaml`: the include
+# glob is `*_pilke_*.log`, and the namespace is part of the filename, so the
+# filter applies before a line is ever read. Verify it by looking at what
+# arrived, not by re-reading the pattern.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: otel-collector-agent
-  namespace: pilke
+  namespace: pilke-logs
   labels:
     app: otel-collector-agent
 spec:
@@ -109,7 +114,7 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: otel-collector-config
+            name: otel-collector-agent-config
             items:
               - key: agent.yaml
                 path: agent.yaml

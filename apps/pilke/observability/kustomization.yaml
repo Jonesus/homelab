@@ -2,14 +2,20 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  # Configuration before the workloads that mount it, so a first sync does not
-  # start two collectors against a ConfigMap that does not exist yet. Argo
-  # applies a kustomize build in dependency-free order, so this is a reading
-  # order rather than a guarantee — the collectors crash-loop for a few seconds
-  # and recover if it goes the other way.
+  # Configuration before the workload that mounts it, so a first sync does not
+  # start the gateway against a ConfigMap that does not exist yet. Argo applies
+  # a kustomize build in dependency-free order, so this is a reading order
+  # rather than a guarantee — the gateway crash-loops for a few seconds and
+  # recovers if it goes the other way.
   - collector-config.yaml
   - collector-gateway.yaml
-  - collector-agent.yaml
+
+  # ⚠️ THE AGENT DAEMONSET IS NOT HERE AND CANNOT BE. It mounts hostPath
+  # volumes, this namespace is held to `baseline` PodSecurity by the cluster
+  # default, and `baseline` forbids hostPath — so a DaemonSet synced into this
+  # directory is a DaemonSet whose every pod is rejected at admission. It is its
+  # own Application in `../log-agent.yaml`, against the `pilke-logs` namespace,
+  # and the reasoning for the split is in that file.
 
   # Read by both vmalert instances, which reload them without a restart.
   - alert-rules.yaml

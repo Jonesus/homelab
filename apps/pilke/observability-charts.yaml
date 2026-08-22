@@ -89,7 +89,7 @@ spec:
         # This chart can bring its own log collector as a subchart. It is a
         # cluster-wide `kubernetes_logs` source with the RBAC that implies, and
         # collecting this namespace only is the whole point of the DaemonSet in
-        # `observability/collector-agent.yaml`.
+        # `log-agent/collector-agent.yaml`.
         vector:
           enabled: false
 

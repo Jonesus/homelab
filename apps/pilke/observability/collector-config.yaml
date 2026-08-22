@@ -1,24 +1,26 @@
-# Both collector pipelines, in one ConfigMap because they are one design and
-# reading them side by side is how you see that the agent's output goes through
-# the gateway's redaction rather than around it.
+# The gateway's pipeline. Everything that is stored passes through here, which
+# is what makes this the one place a privacy rule has to be written to hold.
 #
-# ⚠️ EDITING THIS FILE CHANGES NOTHING UNTIL THE PODS ARE REPLACED. Both
-# workloads mount it as a file and read it once at startup, and Argo does not
-# roll a workload because a ConfigMap it mounts changed. The same footgun as
+# ⚠️ EDITING THIS FILE CHANGES NOTHING UNTIL THE PODS ARE REPLACED. The gateway
+# mounts it as a file and reads it once at startup, and Argo does not roll a
+# workload because a ConfigMap it mounts changed. The same footgun as
 # `prerequisites/configmap.yaml`, and the opposite of the alert rules beside it,
 # which vmalert reloads on its own:
 #
-#     kubectl -n pilke rollout restart deploy/otel-collector ds/otel-collector-agent
+#     kubectl -n pilke rollout restart deploy/otel-collector
+#
+# ⚠️ THE AGENT'S PIPELINE IS IN `../log-agent/collector-agent-config.yaml`, in
+# the `pilke-logs` namespace, and the two are one design. The agent ships
+# container stdout into the `otlp` receiver below like any other client, so the
+# `redaction` processor here is what covers the logs as well as the traces —
+# stdout being where PII actually leaks. A rule weakened in this file is
+# weakened for the node logs too, and that is not visible from the agent's side.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: otel-collector-config
   namespace: pilke
 data:
-  # =========================================================================
-  # THE GATEWAY. Everything that is stored passes through here, which is what
-  # makes this the one place a privacy rule has to be written to hold.
-  # =========================================================================
   gateway.yaml: |
     receivers:
       otlp:
@@ -180,148 +182,3 @@ data:
           receivers: [otlp]
           processors: [memory_limiter, redaction, transform, batch]
           exporters: [otlphttp/vlogs]
-
-  # =========================================================================
-  # THE AGENT. Container stdout for this namespace's Deployments, and nothing
-  # else in the cluster.
-  # =========================================================================
-  agent.yaml: |
-    receivers:
-      filelog:
-        # THIS GLOB IS THE SCOPE, and it is the only scope there is. Kubernetes
-        # names the file <pod>_<namespace>_<container>-<id>.log, so a namespace
-        # filter is a filename filter and it applies before a line is ever read.
-        include:
-          - /var/log/containers/*_pilke_*.log
-        exclude:
-          # Both collectors run in this namespace, so without this the collector
-          # reads its own log, describes having read it, reads that, and the
-          # loop is bounded only by the rate limit. Their logs are still there
-          # for `kubectl logs`, which is where you would look for them anyway.
-          - /var/log/containers/otel-collector-*_pilke_*.log
-
-        # Everything already on disk when this starts is history that was never
-        # collected, and replaying weeks of it on first sync would be the
-        # store's first impression of itself.
-        start_at: end
-
-        # Where the read offsets live. Without it a restart re-reads from
-        # `start_at` and loses whatever arrived while the pod was down.
-        storage: file_storage
-
-        include_file_path: true
-        include_file_name: false
-        retry_on_failure:
-          enabled: true
-
-        operators:
-          # Unwraps the container runtime's envelope — the
-          # `2026-08-22T… stdout F …` prefix that containerd and CRI-O write
-          # around every line — and leaves the application's own line as the
-          # body.
-          #
-          # `add_metadata_from_filepath: false` because this operator's path
-          # regex only understands the /var/log/pods/ layout, and the glob above
-          # is deliberately the /var/log/containers/ one. The next operator does
-          # that job against the filename this DaemonSet actually reads.
-          - type: container
-            id: runtime-envelope
-            add_metadata_from_filepath: false
-
-          # Pod, namespace and container come out of the path with a regex.
-          #
-          # THE ALTERNATIVE IS THE k8sattributes PROCESSOR, WHICH READS THE SAME
-          # THREE FACTS FROM THE KUBERNETES API and needs a ClusterRole to list
-          # pods across namespaces to do it. This reads a filename. It holds no
-          # Kubernetes permissions at all, which is as close as a DaemonSet gets
-          # to being namespace-scoped.
-          - type: regex_parser
-            id: metadata-from-filename
-            parse_from: attributes["log.file.path"]
-            regex: '^/var/log/containers/(?P<pod>[^_]+)_(?P<namespace>[^_]+)_(?P<container>.+)-[0-9a-f]+\.log$'
-
-          # Onto the resource, not the record: these describe where the line came
-          # from rather than what it says, and the exporters' stream-field header
-          # is what keeps them from each becoming a stream.
-          - type: move
-            from: attributes.pod
-            to: resource["k8s.pod.name"]
-          - type: move
-            from: attributes.namespace
-            to: resource["k8s.namespace.name"]
-          - type: move
-            from: attributes.container
-            to: resource["k8s.container.name"]
-
-          # In production the backend's console handler writes JSON, so the
-          # fields are parsed rather than guessed at. The guard matters: the
-          # migration Job, gunicorn's own startup lines and anything that
-          # crashes before logging is configured are plain text, and a parser
-          # that fails on them would drop exactly the lines you need when a pod
-          # will not start.
-          - type: json_parser
-            id: application-json
-            parse_from: body
-            if: 'body matches "^\\s*\\{"'
-            on_error: send
-
-    processors:
-      memory_limiter:
-        check_interval: 1s
-        limit_percentage: 75
-        spike_limit_percentage: 25
-
-      transform:
-        error_mode: ignore
-        log_statements:
-          # The container name is `api`, `worker` or `scheduler`; the traces from
-          # the same process arrive as `pilke-api` and so on from
-          # OTEL_SERVICE_NAME. They have to agree, or a service looks like two
-          # services and the trace-to-logs click lands nowhere.
-          - set(resource.attributes["service.name"], Concat(["pilke", resource.attributes["k8s.container.name"]], "-")) where resource.attributes["k8s.container.name"] != nil
-          # The second of the two stream fields. Constant here because this
-          # cluster is the production one; it exists so the field is present and
-          # low-cardinality rather than absent.
-          - set(resource.attributes["deployment.environment"], "prod")
-
-      batch:
-        send_batch_size: 1024
-        timeout: 5s
-
-    extensions:
-      # A hostPath, unlike the gateway's: read offsets are per-node state and
-      # they are the one thing here that must outlive the pod. Losing them
-      # re-reads or skips a node's log tail.
-      file_storage:
-        directory: /var/lib/otelcol-agent
-
-      health_check:
-        endpoint: 0.0.0.0:13133
-
-    exporters:
-      # THROUGH THE GATEWAY, NOT STRAIGHT TO THE STORE. Container stdout is
-      # where PII leaks in practice — a stray log of a response body puts
-      # profiles and phone numbers on disk — so the agent's output goes through
-      # the same `redaction` processor as everything else, and only the gateway
-      # knows the stores' addresses.
-      #
-      # `logs_endpoint` with the full path here too, for the same reason as in
-      # the gateway: the key that appends a path for you is the one that 404s.
-      otlphttp/gateway:
-        logs_endpoint: http://otel-collector:4318/v1/logs
-        sending_queue:
-          enabled: true
-          storage: file_storage
-        retry_on_failure:
-          enabled: true
-
-    service:
-      extensions: [file_storage, health_check]
-      telemetry:
-        logs:
-          level: info
-      pipelines:
-        logs:
-          receivers: [filelog]
-          processors: [memory_limiter, transform, batch]
-          exporters: [otlphttp/gateway]

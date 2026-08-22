@@ -1,0 +1,78 @@
+# The log-collecting DaemonSet, in a namespace of its own, because of what
+# PodSecurity does to a hostPath.
+#
+# Reading a container's stdout means reading a file the kubelet wrote on the
+# node, and the only way into a node's filesystem is a `hostPath` volume. This
+# cluster enforces `baseline` on every namespace that carries no
+# `pod-security.kubernetes.io/*` label of its own — `pilke` carries none, which
+# is why it gets `baseline` without saying so anywhere — and `baseline` forbids
+# hostPath outright. Under it the agent is not a degraded agent, it is zero
+# pods: admission rejects each create the DaemonSet controller attempts, so
+# there is nothing to look at in `kubectl logs` and nothing crash-looping,
+# only events.
+#
+# ⚠️ THIS NAMESPACE IS PRIVILEGED AND THE APPLICATION'S IS NOT, AND THAT
+# ASYMMETRY IS THE ENTIRE REASON THIS APPLICATION EXISTS. The api, worker and
+# scheduler pods in `pilke` run `runAsNonRoot`, drop every capability and set a
+# `RuntimeDefault` seccomp profile, and the cluster default holds the whole
+# namespace to `baseline` underneath that — a backstop that catches the future
+# manifest which forgets one of the three. Relabelling `pilke` privileged to let
+# a log shipper mount a hostPath would lift that backstop off three application
+# workloads, permanently and cluster-visibly, to buy one DaemonSet one volume
+# type. Here the same label covers exactly one pod per node whose only job is to
+# read the host's log directory, and nothing else is allowed to live in this
+# namespace.
+#
+# ⚠️ Privileged is the admission level, not the pod. Nothing about the DaemonSet
+# asks for privilege: no capabilities at all, no privilege escalation, a
+# read-only root filesystem, both log mounts read-only, and no Kubernetes
+# permissions of any kind. `baseline` was the single thing standing between it
+# and a hostPath. What this level really costs is that anything else added to
+# this namespace can also ask for a hostPath, host PID or host network without
+# being stopped — which is why `log-agent/` holds one workload and should keep
+# holding one.
+#
+# The labels go on through `syncPolicy.managedNamespaceMetadata`, which is how a
+# namespace Argo creates gets labelled in this repository —
+# `infrastructure/democratic-csi/app.yaml` is the same pattern for the same
+# reason. ⚠️ It only applies to a namespace this Application creates or adopts,
+# so do not create `pilke-logs` by hand: a namespace made with `kubectl create
+# ns` has no labels, is not managed here, and rejects every pod exactly as
+# before.
+#
+# No sync wave. The agent resolves the gateway in `pilke` by DNS at export time
+# and retries on failure, so it can be created before it, after it, or while it
+# is being replaced.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pilke-log-agent
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: pilke-logs
+    server: https://kubernetes.default.svc
+  project: apps
+  source:
+    path: apps/pilke/log-agent
+    repoURL: https://github.com/jonesus/homelab
+    targetRevision: HEAD
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: privileged
+        # Audit and warn move with enforce deliberately. Left unset they fall
+        # back to the cluster's own defaults, which are stricter here than the
+        # `baseline` that enforce defaults to — `kubectl apply` of this
+        # DaemonSet warns about `restricted` — so every apply and every audit
+        # entry would carry a paragraph about the hostPath that is the reason
+        # this namespace exists. That is noise which teaches a reader to skip
+        # the one place a real PodSecurity warning would appear.
+        pod-security.kubernetes.io/audit: privileged
+        pod-security.kubernetes.io/warn: privileged
