@@ -183,14 +183,21 @@ data:
           # row somebody can see rather than a message that silently never
           # arrived. This is that row reaching a phone.
           - alert: PilkePushUndeliverable
-            # ⚠️ BOTH abandon paths, and the reason this is a regexp rather than
-            # one logger. A notification is abandoned in two places:
-            # `outbox._fail` when the attempts run out, and `receipts._resolve`
-            # when every device refuses it. The two log the same sentence
-            # deliberately -- both modules' docstrings say so -- precisely so
-            # that one expression matches either. Pinning a single logger threw
-            # that away and left attempt-exhausted abandonments unalerted.
-            expr: 'logger:~"^treffit_backend\.notifications\.(outbox|receipts)$" AND _msg:"abandoned" | stats count() as abandoned | filter abandoned:>0'
+            # ⚠️ THE WHOLE notifications PACKAGE, not a list of loggers. A
+            # notification is abandoned in two places today -- `outbox._fail` when the
+            # attempts run out and `receipts._resolve` when every device refuses it --
+            # and both log the same sentence on purpose, so that one expression matches
+            # either. Pinning one logger threw that away and left attempt-exhausted
+            # abandonments unalerted; naming both would leave the third one unalerted
+            # the day it is written. A prefix covers the package, and every abandoned
+            # notification in it is worth a phone call, whoever logged it.
+            #
+            # A regexp would read more precisely and does not parse: this LogsQL
+            # rejects a quoted pattern after `:~`, and vmalert validates rules at
+            # startup and refuses to run -- so a bad expression here does not degrade
+            # alerting, it stops the pod booting while the previous one keeps
+            # evaluating. Test an expression against the store before committing it.
+            expr: 'logger:"treffit_backend.notifications."* AND _msg:"abandoned" | stats count() as abandoned | filter abandoned:>0'
             labels:
               severity: warning
             annotations:
