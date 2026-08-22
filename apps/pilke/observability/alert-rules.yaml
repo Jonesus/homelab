@@ -183,7 +183,14 @@ data:
           # row somebody can see rather than a message that silently never
           # arrived. This is that row reaching a phone.
           - alert: PilkePushUndeliverable
-            expr: 'logger:="treffit_backend.notifications.receipts" AND _msg:"abandoned" | stats count() as abandoned | filter abandoned:>0'
+            # ⚠️ BOTH abandon paths, and the reason this is a regexp rather than
+            # one logger. A notification is abandoned in two places:
+            # `outbox._fail` when the attempts run out, and `receipts._resolve`
+            # when every device refuses it. The two log the same sentence
+            # deliberately -- both modules' docstrings say so -- precisely so
+            # that one expression matches either. Pinning a single logger threw
+            # that away and left attempt-exhausted abandonments unalerted.
+            expr: 'logger:~"^treffit_backend\.notifications\.(outbox|receipts)$" AND _msg:"abandoned" | stats count() as abandoned | filter abandoned:>0'
             labels:
               severity: warning
             annotations:

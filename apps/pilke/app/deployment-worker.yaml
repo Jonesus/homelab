@@ -73,6 +73,21 @@ spec:
             # attributes a new build's errors to an old release.
             - name: SERVICE_VERSION
               value: sha-414fbb6
+            # ⚠️ The API does not need this and these two do. `telemetry.py`
+            # builds the Resource, reads SERVICE_VERSION and puts
+            # service.version on every span -- but only on the gunicorn path,
+            # where `post_fork` calls it. These two start under
+            # `opentelemetry-instrument`, whose distro builds the Resource from
+            # the standard variables before our code is reached, and
+            # SERVICE_VERSION is a name we invented, so it is ignored. Without
+            # this line their spans carry no version at all and "which build
+            # broke" is unanswerable for two thirds of the processes.
+            #
+            # $(SERVICE_VERSION) rather than a repeated literal: Kubernetes
+            # expands one env var into another, so the tag above stays the one
+            # place it is written per Deployment.
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.version=$(SERVICE_VERSION)"
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
