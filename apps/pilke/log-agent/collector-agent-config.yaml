@@ -110,6 +110,40 @@ data:
             if: 'body matches "^\\s*\\{"'
             on_error: send
 
+          # ⚠️ A parsed field whose name begins with an underscore collides with
+          # VictoriaLogs' own reserved names, and `_stream` is the one that
+          # matters: an incoming field literally called `_stream` is read as the
+          # record's stream definition, arrives alongside the stream fields the
+          # exporter already set, and the store rejects the record with a
+          # panic-level `cannot unmarshal StreamTags: stream tags must be sorted
+          # in alphabetical order` -- naming the same tag twice.
+          #
+          # Nothing this application logs carries such a key. What does is any
+          # container in the namespace that prints a VictoriaLogs query result to
+          # stdout, which is a normal thing to do while debugging and is exactly
+          # how this was found. The records are dropped rather than the store,
+          # which makes it a silent hole in the record instead of an outage.
+          #
+          # Dropped here rather than in the gateway, because the gateway also
+          # carries the OTLP traffic from the application, which never contains
+          # these and should not pay for the check.
+          - type: remove
+            id: drop-reserved-stream
+            field: attributes._stream
+            if: 'attributes["_stream"] != nil'
+          - type: remove
+            id: drop-reserved-stream-id
+            field: attributes._stream_id
+            if: 'attributes["_stream_id"] != nil'
+          - type: remove
+            id: drop-reserved-time
+            field: attributes._time
+            if: 'attributes["_time"] != nil'
+          - type: remove
+            id: drop-reserved-msg
+            field: attributes._msg
+            if: 'attributes["_msg"] != nil'
+
     processors:
       memory_limiter:
         check_interval: 1s
