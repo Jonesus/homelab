@@ -110,39 +110,6 @@ data:
             if: 'body matches "^\\s*\\{"'
             on_error: send
 
-          # ⚠️ A parsed field whose name begins with an underscore collides with
-          # VictoriaLogs' own reserved names, and `_stream` is the one that
-          # matters: an incoming field literally called `_stream` is read as the
-          # record's stream definition, arrives alongside the stream fields the
-          # exporter already set, and the store rejects the record with a
-          # panic-level `cannot unmarshal StreamTags: stream tags must be sorted
-          # in alphabetical order` -- naming the same tag twice.
-          #
-          # Nothing this application logs carries such a key. What does is any
-          # container in the namespace that prints a VictoriaLogs query result to
-          # stdout, which is a normal thing to do while debugging and is exactly
-          # how this was found. The records are dropped rather than the store,
-          # which makes it a silent hole in the record instead of an outage.
-          #
-          # Dropped here rather than in the gateway, because the gateway also
-          # carries the OTLP traffic from the application, which never contains
-          # these and should not pay for the check.
-          - type: remove
-            id: drop-reserved-stream
-            field: attributes._stream
-            if: 'attributes["_stream"] != nil'
-          - type: remove
-            id: drop-reserved-stream-id
-            field: attributes._stream_id
-            if: 'attributes["_stream_id"] != nil'
-          - type: remove
-            id: drop-reserved-time
-            field: attributes._time
-            if: 'attributes["_time"] != nil'
-          - type: remove
-            id: drop-reserved-msg
-            field: attributes._msg
-            if: 'attributes["_msg"] != nil'
 
     processors:
       memory_limiter:
@@ -162,6 +129,31 @@ data:
           # cluster is the production one; it exists so the field is present and
           # low-cardinality rather than absent.
           - set(resource.attributes["deployment.environment"], "prod")
+
+          # ⚠️ A log line must not be able to redefine its own stream. VictoriaLogs
+          # reads an incoming field literally named `_stream` as the record's stream
+          # definition, so a parsed body carrying one arrives beside the stream fields
+          # set above, names the same tag twice, and the store refuses the record with
+          # `cannot unmarshal StreamTags: stream tags must be sorted in alphabetical
+          # order`. It drops the record and logs at panic level, so the symptom is a
+          # hole in the record rather than an outage.
+          #
+          # Nothing this application logs carries such a key. What does is any
+          # container in the namespace that prints a VictoriaLogs query result to
+          # stdout -- an ordinary thing to do while debugging, and how this was found.
+          #
+          # It is done here rather than with a `remove` operator because the parsed
+          # keys land in the body, not in attributes: json_parser reads `parse_from:
+          # body` and writes back to the same place.
+          #
+          # `IsMap` is load-bearing. The parser leaves body a string for every line
+          # that is not JSON, delete_key on a string is an error, and this processor
+          # runs with error_mode: ignore -- so without the guard it would fail
+          # silently on the majority of lines rather than loudly.
+          - delete_key(log.body, "_stream") where IsMap(log.body)
+          - delete_key(log.body, "_stream_id") where IsMap(log.body)
+          - delete_key(log.body, "_time") where IsMap(log.body)
+          - delete_key(log.body, "_msg") where IsMap(log.body)
 
       batch:
         send_batch_size: 1024
