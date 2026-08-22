@@ -8,6 +8,13 @@ resources:
   # rather than a guarantee — the gateway crash-loops for a few seconds and
   # recovers if it goes the other way.
   - collector-config.yaml
+  # The gateway's OTLP receiver on 4319 requires this key and the container
+  # fails to start without the environment variable it provides, so it is read
+  # here before the workload for the same reason the ConfigMap is. Argo applies
+  # a build in dependency-free order, so this is a reading order rather than a
+  # guarantee: out of order, the pods sit in CreateContainerConfigError for a
+  # few seconds and recover on their own.
+  - otlp-ingest-key.sealed.yaml
   - collector-gateway.yaml
 
   # ⚠️ THE AGENT DAEMONSET IS NOT HERE AND CANNOT BE. It mounts hostPath
@@ -23,12 +30,25 @@ resources:
   # LAN only, on internal-ca.
   - ingress-grafana.yaml
 
-  # ⚠️ ingress-otlp.yaml IS DELIBERATELY ABSENT. It is the only internet-facing
-  # object in this stack, and it lands with Phase 3: the app's instrumentation,
-  # the ingest key the collector will require, and the privacy policy amendment
-  # that makes collecting from a tester's phone lawful. Adding it before those
-  # publishes an unauthenticated ingest endpoint and collects client-side
-  # telemetry under a policy that says there is none. The reasoning is in the
-  # file itself.
+  # ⚠️ THE ONLY INTERNET-FACING OBJECT IN THIS STACK, and both of the things
+  # that gate it hold. The collector requires a key: this file routes one path
+  # to port 4319, the receiver in `collector-config.yaml` that refuses a POST
+  # without the bearer token in `otlp-ingest-key.sealed.yaml`. An Ingress here
+  # pointed at 4318 instead publishes an open ingest and looks identical from
+  # outside until somebody posts without a token, which is why the port number
+  # is worth reading twice.
+  #
+  # The other gate is not in this repository and cannot be checked from it: the
+  # published privacy statement has to describe error and performance telemetry
+  # before an app build sends any — it does, under *Virheet ja suorituskyky* /
+  # *Errors and diagnostics*, with a basis and a 30-day retention that the
+  # stores actually enforce. This Ingress landing first collects nothing on its
+  # own; the app build pointed at it is the step that must not go first.
+  #
+  # ⚠️ Its `proxy-body-size: 1m` is why this is a second Ingress object rather
+  # than a path on `../app/ingress.yaml`, which carries 10m for photograph
+  # uploads. nginx annotations are per-Ingress: merged, one of those two values
+  # would be wrong.
+  - ingress-otlp.yaml
 
 namespace: pilke

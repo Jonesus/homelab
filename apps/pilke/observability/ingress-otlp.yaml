@@ -1,22 +1,24 @@
-# ⚠️ NOT IN kustomization.yaml YET, ON PURPOSE. See the note there.
+# ⚠️ THE ONLY PUBLIC SURFACE IN THIS STACK. Everything else under
+# `observability/` is reachable from the LAN at most, so this one object is the
+# whole of the attack surface telemetry adds, and it is referenced from
+# `kustomization.yaml` only because both of the things that gate it hold:
 #
-# This file is the moment telemetry ingest becomes reachable from the internet,
-# and it lands with Phase 3 — the app's instrumentation — and not before. Two
-# things have to be true in the same commit:
+#   1. The legal gate. Collecting from a tester's phone is defensible while the
+#      published privacy statement describes error and performance telemetry —
+#      *Virheet ja suorituskyky* / *Errors and diagnostics*, with a legitimate
+#      interest and a 30-day retention the two stores enforce themselves. That
+#      text is in `pilke-web` and nothing here can verify it; a change that
+#      removes it is a reason to remove this file.
+#   2. The collector requires an ingest key. `collector-config.yaml` carries a
+#      `bearertokenauth` extension on a second OTLP receiver, and this Ingress
+#      routes to that receiver's port and not to the open one — see the backend
+#      at the bottom, which is the single line the whole property rests on.
 #
-#   1. The legal gate (Phase 1b) is done. Server-side telemetry about one's own
-#      service is defensible with the privacy policy amended; collecting from a
-#      tester's phone under a policy that says there is none is not.
-#   2. The collector requires an ingest key. The gateway's config has no
-#      authentication extension today because nothing needs one while this file
-#      is unreferenced. Phase 3 adds a `bearertokenauth` extension to the
-#      gateway's OTLP receiver and ships the matching header in the bundle.
-#      A static key in a JS bundle is obfuscation and not a secret — say so
-#      rather than letting a future reader assume otherwise. It keeps a scanner
-#      from finding an open ingest, and it can be rotated.
-#
-# Until both are true, this stack has no public surface at all, which is what
-# makes Phases 0 to 2 useful on their own.
+# ⚠️ THE KEY IS OBFUSCATION AND NOT A SECRET. It ships inside the app's JS
+# bundle, so everybody holding the APK holds it. It keeps a scanner from
+# finding an open ingest and it can be rotated; it does not make this endpoint
+# private, and the rate limits below are what actually bound abuse by somebody
+# who has read the bundle.
 #
 # The endpoint is a path and not a hostname because an Ingress must live in its
 # backend's namespace: the collector is in `pilke`, so telemetry goes to
@@ -64,12 +66,22 @@ spec:
         paths:
           # ONLY THIS PATH. No /otlp/v1/logs — the app sends spans and the
           # DaemonSet reads the backend's stdout, so nothing outside the cluster
-          # has a reason to write log records. And no OTLP/gRPC: the collector
+          # has a reason to write log records. The receiver behind this port is
+          # in the traces pipeline alone, so `/v1/logs` there is a 404 as well:
+          # two locks on the same door, because this is the one that a later
+          # edit here could quietly unlock. And no OTLP/gRPC: the collector
           # listens on HTTP only, so there is nothing to expose.
           - path: /otlp/v1/traces
             pathType: Prefix
             backend:
               service:
                 name: otel-collector
+                # ⚠️ 4319, NOT 4318. 4319 is the receiver that requires the
+                # bearer token; 4318 is the one the API, the worker, the
+                # scheduler and the log agent use with no credential, because
+                # a receiver's authenticator has no per-client exemption to
+                # grant them. Both ports answer `/v1/traces` identically to a
+                # request that carries the key, so 4318 here would look like a
+                # working ingest and be an open one.
                 port:
-                  number: 4318
+                  number: 4319

@@ -1,0 +1,16 @@
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  creationTimestamp: null
+  name: pilke-otlp-ingest-key
+  namespace: pilke
+spec:
+  encryptedData:
+    OTLP_INGEST_KEY: AgCw4e7Sl7iGzg+XN6cCz9og35pjd8jkgHU2tNVZDxJQzTcnyj9RuatxicRcRuBRaSWqWkkoDVdbj+hor8EC16GKBsCSfXKX4ozJwleCX+gg7QK6xAtVziujQYcmm5QR17U2yDlDixDqWjijJWzKN3C6c6jubSaok3ud9EZlDkZy3HMRDeNArp9X5vKvKtKOTMUPxxqykrVDXzd42JZhkcEfRlyNCzud/QkhvFossoK407HsPMQpE7St/qe+Btw425ziXmo+maZsYgclyPqAvsAe3ZQuGUhbsZ1hJD5n8mozasHudvHbvprnLcW66l+n95ZhrQuO4mM+40hRHVn9lYNu+npXJZ2+ry1N4sh8fQMLTD+x1KcWYBC3t9Kee9Gl0oCbTmXifWCWdC3Ug+cmOmum9x4kSq96wE4JiYXGnWXwTbUTg412rZImDm1+u7scM4ATqqmTFpxOfwMqzrj4eUCcusoK+WlBC/eOWWN+ls2nJR+hHSNUMsU8va7jo7l4wlD0YRAVJ0Syp/ROHOc5GrfqF+ppELun9BrRT/8h1YqvqidH+aPmfg0UtAO15BgaowjVJQbcnS5HABUcgIiH7BEhl55O32G2l4ZbSlLWDB4HTD4ZV2H4xrk+CVQG4+6EtqzuiTlD9zX6bK26WgHIlslztcwSwDT1kj/n1nC49+oIdc5tJ6f/Is0rNDmfvkANn5GzOvsISc0rmf1G9+AfxIm5FyqcBpYayI2ExiEKI6QeW1SA90erFbrXV8CCqC7CDLeqTw1jdwVQvYdHwwR4abaT
+  template:
+    metadata:
+      creationTimestamp: null
+      name: pilke-otlp-ingest-key
+      namespace: pilke
+    type: Opaque
+

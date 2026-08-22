@@ -71,8 +71,30 @@ spec:
           ports:
             - name: otlp-http
               containerPort: 4318
+            # The authenticated receiver, and the only port an Ingress points
+            # at. Separate from 4318 because the senders inside this namespace
+            # send no `Authorization` header — the reasoning is on the two
+            # receivers in `collector-config.yaml`.
+            - name: otlp-public
+              containerPort: 4319
             - name: health
               containerPort: 13133
+          # ⚠️ The gateway does not start without this. `bearertokenauth` reads
+          # `${env:OTLP_INGEST_KEY}` and fails at startup on an empty one, which
+          # is the right failure: a collector that came up with no expected
+          # token would be an authenticated endpoint accepting anything. The
+          # Secret is `otlp-ingest-key.sealed.yaml` in this directory.
+          #
+          # A restart is what puts a rotated key in effect. Neither a Secret
+          # nor a ConfigMap change rolls a Deployment:
+          #
+          #     kubectl -n pilke rollout restart deploy/otel-collector
+          env:
+            - name: OTLP_INGEST_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pilke-otlp-ingest-key
+                  key: OTLP_INGEST_KEY
           # The `health_check` extension, which reports the pipeline's state
           # rather than the process's. A collector whose exporters are all
           # failing is a pod that should not be receiving.
@@ -158,3 +180,12 @@ spec:
       protocol: TCP
       port: 4318
       targetPort: otlp-http
+    # ⚠️ 4319 IS THE AUTHENTICATED PORT AND 4318 IS NOT. `ingress-otlp.yaml`
+    # must name this one; an Ingress pointed at 4318 publishes an open ingest
+    # and looks identical from outside until somebody posts without a token.
+    # Nothing inside the cluster addresses this port — in-namespace senders
+    # would be refused on it, having no header to send.
+    - name: otlp-public
+      protocol: TCP
+      port: 4319
+      targetPort: otlp-public

@@ -23,10 +23,48 @@ metadata:
 data:
   gateway.yaml: |
     receivers:
+      # ⚠️ TWO OTLP RECEIVERS, AND WHICH OF THEM IS AUTHENTICATED IS THE WHOLE
+      # DESIGN. This one is the in-cluster ingest and it takes no credential:
+      # the three application Deployments reach it through
+      # `OTEL_EXPORTER_OTLP_ENDPOINT` in `../prerequisites/configmap.yaml`, and
+      # the agent DaemonSet has `otel-collector.pilke.svc.cluster.local:4318`
+      # written into `../log-agent/collector-agent-config.yaml`, in another
+      # namespace and another Argo Application. None of those four senders sets
+      # an `Authorization` header, and there is no per-client exemption to
+      # configure in a receiver's authenticator — so requiring a token *here*
+      # stops all four, and stops them silently: a refused export is a line in
+      # the sender's own log and an absence in Grafana.
+      #
+      # What keeps this port private is that it is a ClusterIP port with
+      # nothing routing to it from outside. `ingress-otlp.yaml` names 4319.
       otlp:
         protocols:
           http:
             endpoint: 0.0.0.0:4318
+
+      # The public half, and the only receiver `ingress-otlp.yaml` can reach.
+      # A second receiver rather than a second protocol on the one above,
+      # because the authenticator is a property of a receiver's server: "open
+      # inside the namespace, authenticated from the internet" is two servers
+      # however it is written, and putting the new port on the public side is
+      # what makes this change need no restart of anything but the gateway.
+      #
+      # ⚠️ IN THE TRACES PIPELINE ONLY, and that is a second lock rather than
+      # tidiness. The OTLP receiver serves `/v1/logs` only when a logs pipeline
+      # names it, so leaving this receiver out of the logs pipeline below is
+      # what makes a log record posted at this port a 404. The app sends spans;
+      # log records arrive from the agent on 4318.
+      #
+      # No `cors` block: the sender is a React Native bundle making a plain
+      # POST, not a browser making a preflighted one. A web build would need
+      # `allowed_origins` here plus `Authorization` in `allowed_headers`, and
+      # its preflight fails without them.
+      otlp/public:
+        protocols:
+          http:
+            endpoint: 0.0.0.0:4319
+            auth:
+              authenticator: bearertokenauth
 
     processors:
       # First in every pipeline, and it has to be: it works by refusing data at
@@ -124,6 +162,33 @@ data:
         timeout: 5s
 
     extensions:
+      # ⚠️ THIS KEY IS OBFUSCATION AND NOT A SECRET, and every decision around
+      # it has to be read that way. It is compiled into the app's JS bundle, so
+      # everybody holding the APK holds the key; what it buys is that a scanner
+      # sweeping `api.pilke.app` does not find an open ingest, and that abuse
+      # can be answered by rotating one value. It does NOT make this endpoint
+      # private, and nothing downstream may treat a span as ours because it
+      # arrived with the key. The Ingress rate limits and `memory_limiter`
+      # above are what actually bound the damage, and the `redaction` processor
+      # is what bounds what a forged span can put in the store.
+      #
+      # Read from the environment rather than written here, out of
+      # `otlp-ingest-key.sealed.yaml` by way of the gateway's `env` — keeping a
+      # rotatable value out of this repository's history is worth doing even
+      # for a value that ends up in a bundle. An unset or empty variable is a
+      # startup failure, `no bearer token provided`, rather than a collector
+      # running with an empty expected token.
+      #
+      # Rotation is three steps and the middle one is the one that gets
+      # forgotten: reseal this value, `rollout restart deploy/otel-collector`
+      # (a ConfigMap or Secret change does not roll a Deployment on its own),
+      # then ship an app build carrying the new key. Between the restart and
+      # that build, client telemetry is refused with a 401 — so rotate in the
+      # other order, or accept the gap knowingly.
+      bearertokenauth:
+        scheme: Bearer
+        token: ${env:OTLP_INGEST_KEY}
+
       # The buffer that makes a store restart a delay rather than a hole in the
       # record. Two single-replica stores get restarted by every upgrade and
       # every node move, and without a queue behind them each one is a gap.
@@ -169,13 +234,17 @@ data:
           enabled: true
 
     service:
-      extensions: [file_storage, health_check]
+      extensions: [bearertokenauth, file_storage, health_check]
       telemetry:
         logs:
           level: info
       pipelines:
         traces:
-          receivers: [otlp]
+          # Both receivers into one pipeline, so a span from a phone is redacted
+          # by exactly the same processors as a span from the API. The public
+          # receiver being authenticated changes where a span may come from and
+          # nothing about what happens to it afterwards.
+          receivers: [otlp, otlp/public]
           processors: [memory_limiter, redaction, transform, batch]
           exporters: [otlphttp/vtraces]
         logs:
