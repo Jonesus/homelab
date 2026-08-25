@@ -9,7 +9,7 @@ spec:
   selector:
     matchLabels:
       app: redis
-  replicas: 0
+  replicas: 1
   template:
     metadata:
       labels:
@@ -22,7 +22,7 @@ spec:
             - containerPort: 6379
           volumeMounts:
             - name: redis-data
-              mountPath: /data/redis
+              mountPath: /data
           resources:
             requests:
               cpu: 100m
@@ -33,5 +33,5 @@ spec:
       volumes:
         - name: redis-data
           persistentVolumeClaim:
-            claimName: nas-redis-pvc
+            claimName: redis-data-pvc
       restartPolicy: Always
