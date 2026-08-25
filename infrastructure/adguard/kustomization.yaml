@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - config-pv.yaml
   - config-pvc.yaml
+  - config-truenas-pvc.yaml
   - deployment.yaml
   - loadbalancer.yaml
   - ingress.yaml
