@@ -4,7 +4,7 @@ metadata:
   name: mosquitto
   namespace: homeassistant
 spec:
-  replicas: 0
+  replicas: 1
   selector:
     matchLabels:
       app: mosquitto
@@ -40,4 +40,4 @@ spec:
           name: mosquitto-config
       - name: data
         persistentVolumeClaim:
-          claimName: nas-mosquitto-pvc
+          claimName: mosquitto-data-pvc
