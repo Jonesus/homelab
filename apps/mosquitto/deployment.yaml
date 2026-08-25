@@ -4,7 +4,7 @@ metadata:
   name: mosquitto
   namespace: homeassistant
 spec:
-  replicas: 1
+  replicas: 0
   selector:
     matchLabels:
       app: mosquitto

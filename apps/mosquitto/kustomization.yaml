@@ -6,4 +6,5 @@ resources:
   - deployment.yaml
   - persistentvolume.yaml
   - persistentvolumeclaim.yaml
+  - data-pvc.yaml
   - service.yaml
