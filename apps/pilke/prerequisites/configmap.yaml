@@ -155,11 +155,45 @@ data:
   # service: the API's error rate, the worker's and the scheduler's added
   # together, with no way to tell afterwards which was which.
 
-  # ADMIN_ALERT_BACKEND stays unset: only the logging default exists, and it
-  # reports reaches_an_admin = False. That flag is what entitles the app's copy
-  # to stop short of promising a person reads a safety report, so setting this
-  # without a real mail path would make the shipped copy untrue
-  # (treffit-backend#22).
+  # --- Mail ----------------------------------------------------------------
+  #
+  # PostStack carries every email this product sends: the confirmation link for
+  # the address collected at sign-up, and the safety alert below.
+  # `pilke-app/docs/plans/email.md` argues the choice and records what is open.
+  #
+  # ⚠️ Like SMS_BACKEND, this is also a switch on an echo:
+  # `POST /api/users/me/email/verify` hands its confirmation token back in the
+  # response body exactly while no mail is going out, so that an environment
+  # with no provider can still finish the flow. Naming a real backend closes
+  # that, with no second setting.
+  #
+  # `POSTSTACK_API_KEY` and `POSTSTACK_WEBHOOK_SECRET` are in the sealed secret.
+  # MAIL_FROM, MAIL_ALERT_FROM and MAIL_ALERT_TO are left unset: their defaults
+  # are `hei@pilke.app`, `turvallisuus@pilke.app` and `turvallisuus@pilke.app`,
+  # which is what this deployment wants.
+  MAIL_BACKEND: "treffit_backend.notifications.email.PostStackEmailBackend"
+
+  # ⚠️ SETTING THIS IS A CLAIM ABOUT SOMEBODY'S ATTENTION.
+  #
+  # A safety report and a contested no-show are the two events where a row in a
+  # table is not enough. This backend mails them to MAIL_ALERT_TO —
+  # `turvallisuus@pilke.app`, which has no mailbox: PostStack's inbound routing
+  # catches the whole domain and the owner's own notification channel is what
+  # turns a received message into a person reading it. **That is the half of
+  # `reaches_an_admin` no code can check**, and naming this backend is the
+  # assertion that it holds.
+  #
+  # The half that is checked: the class refuses to send through a mail backend
+  # that only records, so `notify_admins` cannot report that somebody was told
+  # when nobody was. MAIL_BACKEND above is therefore a prerequisite rather than
+  # a companion.
+  #
+  # Three strings in the app still stop short of promising that a person reads a
+  # report (treffit-backend#22, pilke-app#16). They are now **weaker than the
+  # truth**, which is the safe direction and the deliberate order: the copy is
+  # rewritten once somebody has actually watched the channel for a week, not on
+  # the day the variable is set.
+  ADMIN_ALERT_BACKEND: "treffit_backend.notifications.admin_alerts.PostStackAdminAlertBackend"
 
   # DECLINE_LADDER_ENABLED stays unset. Every `hidden` cooldown removes a user
   # from everybody's platter, so at beta pool sizes that rule's cost falls on
