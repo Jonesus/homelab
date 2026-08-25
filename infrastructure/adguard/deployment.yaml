@@ -4,7 +4,7 @@ metadata:
   name: adguard
   namespace: adguard
 spec:
-  replicas: 0
+  replicas: 1
   selector:
     matchLabels:
       app: adguard
@@ -33,4 +33,4 @@ spec:
       volumes:
         - name: adguard-data
           persistentVolumeClaim:
-            claimName: adguard-nas-config-pvc
+            claimName: adguard-data-pvc
