@@ -75,7 +75,15 @@ $G bucket website --allow assets    # the rollback, and the old behaviour
 
 **A rebuild from these manifests alone would come back public.** `garage bucket
 website` is a CLI call against the running pod and there is nothing here that
-expresses it, which is exactly why it is written down. `Jonesus/homelab#4` is the
+expresses it, which is exactly why it is written down.
+
+What the deny closes, precisely: with `/assets` routed to the S3 API, the public
+unsigned path already 403s whatever this flag says — the flag governs the web
+endpoint on 3902, and no Ingress points there any more. Anonymous reads were
+still reachable from **inside** the cluster (measured: 200, with
+`Host: assets.web.garage.internal`), and an Ingress pointed back at 3902 would
+silently reopen them. This is the boundary; the route is what stops the address
+being permanent. `Jonesus/homelab#4` is the
 change, `apps/pilke/app/assets-route.yaml` is the route that reaches the S3 API
 instead of the web endpoint, and `MEDIA_SIGNED_URLS` in Pilke's ConfigMap is the
 half that stops handing out permanent addresses.

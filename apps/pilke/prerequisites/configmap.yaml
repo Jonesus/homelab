@@ -92,11 +92,17 @@ data:
   # `../../garage/README.md` because no manifest here can express it. **A rebuild
   # from these files alone would come back with the bucket public.**
   #
-  # The two halves fail in opposite directions, so the order was: this setting and
-  # the route first, with the bucket still public — photographs then work by
-  # either address and nothing is broken while it is checked — then the deny.
-  # Doing the deny first serves broken images in between; doing this and stopping
-  # leaves the hole open behind a nicer URL. Jonesus/homelab#4.
+  # ⚠️ **The route change alone closes the public unsigned path**, which is not
+  # what the plan expected: `/assets` now reaches the S3 API, and that endpoint
+  # demands a signature whatever the bucket's website flag says. The flag only
+  # governs port 3902, which no Ingress points at any more. So the "photographs
+  # work by either address while this is checked" safety net does not exist —
+  # unsigned addresses already in a phone's persisted cache answer 403 until the
+  # next refetch, bounded by the app's 24-hour `CACHE_MAX_AGE`.
+  #
+  # What the deny is still for: anonymous reads are reachable from **inside** the
+  # cluster on 3902 — measured, 200 with the bucket's Host — and an Ingress
+  # pointed back at that port would silently reopen the hole. Jonesus/homelab#4.
   #
   # `MEDIA_URL_EXPIRY` is left unset: the default is seven days, which is SigV4's
   # own ceiling and comfortably outlives the app's 24-hour persisted cache. A
