@@ -177,29 +177,39 @@ data:
   #
   # A safety report and a contested no-show are the two events where a row in a
   # table is not enough. This backend mails them to MAIL_ALERT_TO —
-  # `turvallisuus@pilke.app`, which has no mailbox: PostStack's inbound routing
-  # catches the whole domain and the owner's own notification channel is what
-  # turns a received message into a person reading it. **That is the half of
-  # `reaches_an_admin` no code can check**, and naming this backend is the
-  # assertion that it holds.
+  # `turvallisuus@pilke.app`, which the owner confirmed on 2026-08-28 is a
+  # **monitored inbox**. **That is the half of `reaches_an_admin` no code can
+  # check**, and naming this backend is the assertion that it holds; the
+  # confirmation is what makes the assertion true rather than aspirational.
   #
   # The half that is checked: the class refuses to send through a mail backend
   # that only records, so `notify_admins` cannot report that somebody was told
   # when nobody was. MAIL_BACKEND above is therefore a prerequisite rather than
   # a companion.
   #
-  # Three strings in the app still stop short of promising that a person reads a
-  # report (treffit-backend#22, pilke-app#16). They are now **weaker than the
-  # truth**, which is the safe direction and the deliberate order: the copy is
-  # rewritten once somebody has actually watched the channel for a week, not on
-  # the day the variable is set.
+  # The app's copy has caught up (treffit-backend#22, pilke-app#16). It used to
+  # stop short of promising that a person reads a report, which was weaker than
+  # the truth once this was set — the safe direction, and deliberately not fixed
+  # on the same day. `report_intro` and `dates.feedback.report.filed` now say the
+  # report is *passed on* to Pilke's staff.
+  #
+  # ⚠️ **None of it says when, and that is a ruling rather than an omission.** A
+  # timeline is risky when a case may have to be taken to the authorities, so the
+  # copy states that a person is told and never how soon. Anybody "finishing" it
+  # with a response time is undoing a decision.
   ADMIN_ALERT_BACKEND: "treffit_backend.notifications.admin_alerts.PostStackAdminAlertBackend"
 
   # DECLINE_LADDER_ENABLED stays unset. Every `hidden` cooldown removes a user
   # from everybody's platter, so at beta pool sizes that rule's cost falls on
   # the users it exists to protect.
 
-  # MEDIA_STORAGE_BACKEND / MEDIA_STORAGE_OPTIONS stay unset — the PVC decision
-  # expressed as a variable. Moving to an object store would also change
-  # `assetUrl` in pilke-app, because the client builds photo URLs by
-  # concatenating the API origin with the path the API returns.
+  # MEDIA_SIGNED_URLS stays unset, which keeps photograph addresses the permanent
+  # same-origin `/assets/…` paths this deployment already serves.
+  #
+  # ⚠️ Turning it on is **two changes, in order**, and one of them is not in this
+  # file: the addresses become signed and expiring (pilke-app#55 item 4), and the
+  # bucket has to stop answering anonymous reads or the unsigned path keeps working
+  # and the signing buys nothing. See `apps/pilke/app/assets-route.yaml`, which is
+  # what serves the anonymous half today, and note that a presigned URL has to be
+  # signed for the host the client will actually use — nginx rewrites Host for that
+  # route, so the signature would not verify against it as configured.
