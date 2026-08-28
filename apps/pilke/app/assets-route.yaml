@@ -1,4 +1,5 @@
-# `/assets` — the profile photographs — served anonymously out of Garage.
+# `/assets` — the profile photographs — served out of Garage's S3 API, which
+# answers only signed requests.
 #
 # Two objects for one route, and both are forced by where things live.
 #
@@ -7,9 +8,36 @@
 # `ExternalName` Service is the standard way across that line: it resolves to
 # Garage's headless Service and gives the Ingress something local to point at.
 #
-# A separate Ingress because the two annotations below are per-object and must
-# not reach the API's own routes: `rewrite-target` would eat every path, and
-# `upstream-vhost` would send the API requests addressed to a bucket.
+# A separate Ingress because `service-upstream` below is per-object and has no
+# business on the API's own routes.
+#
+# ## Why this is the S3 port and not the web one
+#
+# Garage's web endpoint (3902) is the anonymous half: Garage implements no bucket
+# policies and no ACLs, so that endpoint is the only way an unauthenticated GET
+# can reach an object — which is exactly the hole `Jonesus/homelab#4` closes. A
+# presigned URL is an S3 API request, so it has to arrive at **3900**.
+#
+# ⚠️ **Two annotations that this route must NOT carry**, both of which the web
+# endpoint needed and both of which break signatures:
+#
+# `upstream-vhost` rewrote the Host to `assets.web.garage.internal`, because the
+# web endpoint routes by Host against `root_domain`. SigV4 signs the Host the
+# client sent and Garage recomputes it from the Host it receives, so rewriting it
+# makes every photograph 403 — and it reads as the object store being down rather
+# than as a header. ingress-nginx forwards the original Host by default, so the
+# fix is the absence of the annotation.
+#
+# `rewrite-target: /$2` stripped the `/assets` prefix, because the web endpoint
+# serves from the bucket root. The S3 API with path-style addressing wants the
+# opposite: the bucket is the first path segment, so `/assets/users/x.jpg` has to
+# arrive intact with `assets` being the bucket.
+#
+# Those two cancel out into something convenient: **the public URL does not
+# change at all.** `https://api.pilke.app/assets/users/x.jpg` is already exactly
+# what path-style addressing produces for bucket `assets`, key `users/x.jpg` — the
+# same host, the same path, a different port, and no certificate or DNS work.
+# `test_storage.py` asserts that path shape, because this manifest depends on it.
 apiVersion: v1
 kind: Service
 metadata:
@@ -19,9 +47,9 @@ spec:
   type: ExternalName
   externalName: garage.garage.svc.cluster.local
   ports:
-    - name: web
-      port: 3902
-      targetPort: 3902
+    - name: s3
+      port: 3900
+      targetPort: 3900
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -31,14 +59,6 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: "internal-ca"
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    # Garage's web endpoint routes by Host against `root_domain`, so this is
-    # what selects the `assets` bucket. Without it the request arrives as
-    # `api.pilke.app` and Garage has no bucket by that name.
-    nginx.ingress.kubernetes.io/upstream-vhost: "assets.web.garage.internal"
-    # The web endpoint serves from the bucket root, so the `/assets` prefix that
-    # selected this route has to come off: `/assets/users/x.jpg` is the object
-    # `users/x.jpg`.
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
     # ExternalName upstreams are resolved by name at request time rather than
     # from the endpoints list, which is what makes a cross-namespace Service
     # work here at all.
@@ -50,13 +70,21 @@ spec:
       hosts:
         - pilke.internal
   rules:
+    # ⚠️ **Signed URLs name `api.pilke.app`, so `/assets` on this host answers 403
+    # once the bucket is private.** The route stays because it is the LAN path to
+    # the S3 API for anything that signs its own requests; it is not a way to look
+    # at a photograph by hand any more. A signature covers the Host, and this is a
+    # different Host.
     - host: pilke.internal
       http:
         paths:
-          - path: /assets(/|$)(.*)
-            pathType: ImplementationSpecific
+          # A prefix rather than a regex with captures: with `rewrite-target` gone
+          # there is nothing to capture, and the path has to reach Garage exactly
+          # as it arrived.
+          - path: /assets
+            pathType: Prefix
             backend:
               service:
                 name: pilke-assets
                 port:
-                  name: web
+                  name: s3

@@ -2,7 +2,8 @@
 # commit, for the same reason. See the note there.
 #
 # The public half of `assets-route.yaml`; everything about how it works is
-# explained there.
+# explained there. **This is the host presigned URLs name**, so this is the one
+# that has to preserve the Host and the path.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -10,8 +11,9 @@ metadata:
   namespace: pilke
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/upstream-vhost: "assets.web.garage.internal"
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    # No `upstream-vhost` and no `rewrite-target`, and their absence is
+    # load-bearing: a presigned request's signature covers the Host and the path.
+    # `assets-route.yaml` argues both at length.
     nginx.ingress.kubernetes.io/service-upstream: "true"
 spec:
   ingressClassName: nginx
@@ -23,10 +25,10 @@ spec:
     - host: api.pilke.app
       http:
         paths:
-          - path: /assets(/|$)(.*)
-            pathType: ImplementationSpecific
+          - path: /assets
+            pathType: Prefix
             backend:
               service:
                 name: pilke-assets
                 port:
-                  name: web
+                  name: s3

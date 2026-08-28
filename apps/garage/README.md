@@ -52,15 +52,37 @@ $G status
 $G layout assign -z home -c 30G <node-id>
 $G layout apply --version 1
 
-# 3. The bucket, and website access — which is what makes an anonymous GET
-#    possible at all, since Garage implements no bucket policies or ACLs.
+# 3. The bucket. **Website access stays off**: it is the only way an
+#    unauthenticated GET can reach an object, since Garage implements no bucket
+#    policies or ACLs — see the note below.
 $G bucket create assets
-$G bucket website --allow assets
 
 # 4. A key for Pilke, and read+write on that bucket only.
 $G key create pilke
 $G bucket allow --read --write assets --key pilke
 ```
+
+## ⚠️ The `assets` bucket is private, and that is not in any manifest
+
+Pilke's photographs are served through presigned URLs — signed by the API,
+expiring after seven days — and the boundary that makes signing worth anything is
+this bucket refusing anonymous reads:
+
+```bash
+$G bucket website --deny assets     # the state it is in
+$G bucket website --allow assets    # the rollback, and the old behaviour
+```
+
+**A rebuild from these manifests alone would come back public.** `garage bucket
+website` is a CLI call against the running pod and there is nothing here that
+expresses it, which is exactly why it is written down. `Jonesus/homelab#4` is the
+change, `apps/pilke/app/assets-route.yaml` is the route that reaches the S3 API
+instead of the web endpoint, and `MEDIA_SIGNED_URLS` in Pilke's ConfigMap is the
+half that stops handing out permanent addresses.
+
+Undoing it is both halves in the other order: allow the website again, unset
+`MEDIA_SIGNED_URLS`, restart the pods. Photograph URLs already in a phone's
+persisted cache keep working either way — the app tolerates both shapes.
 
 Step 4 prints an access key id and a secret. They go into
 `apps/pilke/prerequisites/app-secrets.unsealed.yaml` as `AWS_ACCESS_KEY_ID` and

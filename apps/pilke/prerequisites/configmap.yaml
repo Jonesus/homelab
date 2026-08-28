@@ -61,12 +61,48 @@ data:
   #
   # Path addressing because Garage's virtual-host style needs a wildcard DNS
   # entry under `s3_region`, and the cluster has none.
+  # `signing_endpoint_url` is the project's own option and the reason a photograph
+  # can be both uploaded internally and opened from a phone. One `endpoint_url`
+  # does both jobs until addresses are signed, and then they pull apart: a `PUT`
+  # is made by this pod and wants the cluster service, while a presigned `GET` is
+  # opened by somebody's phone and has to name a host that phone can resolve. A
+  # signature covers the Host, so signing with the internal address produces URLs
+  # that verify correctly and cannot be opened.
+  #
+  # Uploads therefore stay on the cluster network — two hops, no public DNS, no
+  # dependency on the ingress being healthy — and only the signature is computed
+  # for `api.pilke.app`. `treffit_backend/utils/storage.py` argues it.
   MEDIA_STORAGE_OPTIONS: >-
     {"bucket_name": "assets",
      "endpoint_url": "http://garage.garage.svc.cluster.local:3900",
+     "signing_endpoint_url": "https://api.pilke.app",
      "region_name": "garage",
      "addressing_style": "path",
      "file_overwrite": false}
+
+  # ⚠️ THIS IS HALF OF A SECURITY CONTROL, AND THE OTHER HALF IS NOT IN GIT.
+  #
+  # On its own this changes the address a photograph is served at — from a
+  # permanent `/assets/<key>` to a presigned URL that expires — and nothing about
+  # who may read one. The boundary is Garage refusing anonymous reads:
+  #
+  #     garage bucket website --deny assets
+  #
+  # which is a CLI call against the running pod, recorded in
+  # `../../garage/README.md` because no manifest here can express it. **A rebuild
+  # from these files alone would come back with the bucket public.**
+  #
+  # The two halves fail in opposite directions, so the order was: this setting and
+  # the route first, with the bucket still public — photographs then work by
+  # either address and nothing is broken while it is checked — then the deny.
+  # Doing the deny first serves broken images in between; doing this and stopping
+  # leaves the hole open behind a nicer URL. Jonesus/homelab#4.
+  #
+  # `MEDIA_URL_EXPIRY` is left unset: the default is seven days, which is SigV4's
+  # own ceiling and comfortably outlives the app's 24-hour persisted cache. A
+  # shorter expiry would leave the date screen — deliberately readable offline —
+  # drawing broken images on exactly the cold start it exists for.
+  MEDIA_SIGNED_URLS: "1"
 
   # NOTE: STATIC_DIR is deliberately absent. The Dockerfile runs collectstatic
   # at build time into /app/static, which is STATIC_ROOT's default, and
@@ -203,13 +239,3 @@ data:
   # from everybody's platter, so at beta pool sizes that rule's cost falls on
   # the users it exists to protect.
 
-  # MEDIA_SIGNED_URLS stays unset, which keeps photograph addresses the permanent
-  # same-origin `/assets/…` paths this deployment already serves.
-  #
-  # ⚠️ Turning it on is **two changes, in order**, and one of them is not in this
-  # file: the addresses become signed and expiring (pilke-app#55 item 4), and the
-  # bucket has to stop answering anonymous reads or the unsigned path keeps working
-  # and the signing buys nothing. See `apps/pilke/app/assets-route.yaml`, which is
-  # what serves the anonymous half today, and note that a presigned URL has to be
-  # signed for the host the client will actually use — nginx rewrites Host for that
-  # route, so the signature would not verify against it as configured.

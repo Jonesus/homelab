@@ -130,10 +130,14 @@ Each step's check is what says it worked.
    - `https://pilke.internal/admin/` renders **with CSS** (proves WhiteNoise is
      serving the static baked into the image), and a login sticks across a
      refresh (proves the cookie and proxy settings);
-   - a photograph uploaded through the API comes back over `/assets/...`. That
-     one request exercises the whole chain — `SameOriginS3Storage` returning a
-     path rather than a bucket URL, the `/assets` Ingress rewriting it, and
-     Garage's web endpoint answering anonymously — and nothing else does;
+   - a photograph uploaded through the API comes back over `/assets/...` with an
+     `X-Amz-Signature` on it, and opening that URL returns the image. That one
+     request exercises the whole chain — the upload going to Garage's S3 API over
+     the cluster network, `SameOriginS3Storage` signing for `api.pilke.app`
+     instead, the `/assets` Ingress passing Host and path through untouched, and
+     Garage verifying the signature — and nothing else does. Trimming the query
+     string off that URL must answer **403**: that is the anonymous read being
+     refused, which is the whole point (`Jonesus/homelab#4`);
    - `kubectl -n pilke logs deploy/pilke-scheduler` shows `Scheduling 5 periodic job(s)`.
 3. **Seed.**
    ```bash
