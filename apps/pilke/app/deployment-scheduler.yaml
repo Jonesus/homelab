@@ -43,7 +43,7 @@ spec:
           # command, or the container exits with "executable file not found".
           # CI does not build this image — see ../README.md and
           # treffit-backend/docs/releasing.md.
-          image: ghcr.io/boissit/treffit-backend:sha-ec3e1a9
+          image: ghcr.io/boissit/treffit-backend:sha-d7cff22
           # `opentelemetry-instrument` is the zero-code path, and it is the
           # simplest correct one here because this process does not fork. The
           # API cannot use it: gunicorn forks, and a `BatchSpanProcessor` built

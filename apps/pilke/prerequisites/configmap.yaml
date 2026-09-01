@@ -131,21 +131,35 @@ data:
   # kustomization, because that Ingress is what makes the API reachable from the
   # internet. Neither belongs without the other.
   #
-  # `GATEWAYAPI_TOKEN` is in the sealed secret and was proved against the live
-  # service before this was set: an empty token with this backend selected FAILS
+  # `SEVEN_API_KEY` is in the sealed secret and was proved against the live
+  # service before this was set: an empty key with this backend selected FAILS
   # every login rather than falling back to echoing the code, which is the right
   # failure and a poor surprise.
   #
-  # `GATEWAYAPI_SENDER` stays empty — the account default is proven to deliver to
-  # Finnish numbers, and an unauthorised Finnish alphanumeric sender is refused
-  # or silently rewritten depending on the route. `GATEWAYAPI_BASE_URL` stays
-  # unset: this account is on the EU platform, which is the default, and
-  # `gatewayapi.com` answers 401 "Invalid token" with a perfectly good one.
+  # ⚠️ A refused key does not announce itself. seven.io answers HTTP 200 with
+  # `success: "900"` in the body, so nothing about the transport looks unusual and
+  # `SevenSmsBackend._check` reads the body instead. `/api/balance` answers the
+  # same `"900"`, which is how a key is proved without spending anything.
+  #
+  # ⚠️ The credit is prepaid, which makes it an availability dependency rather
+  # than a cost: exhaustion sends no code, so nobody signs in — including anybody
+  # whose session happens to lapse that week. The gateway returns the balance on
+  # every send and `SEVEN_LOW_BALANCE_EUROS` warns below it. That warning predicts
+  # a total authentication outage, so it is worth alerting on rather than reading.
+  #
+  # `SEVEN_SENDER` stays empty, leaving the account default. ⚠️ Since Traficom
+  # Order 28 L/2025 an unregistered sender ID towards a Finnish number displays as
+  # `Tuntematon`, and from 2 November 2026 the message is blocked or labelled
+  # `Roskaposti` — a deadline rather than a cosmetic. `SEVEN_BASE_URL` stays
+  # unset: seven.io runs one platform, so there is no wrong host to pick.
+  #
+  # `GATEWAYAPI_TOKEN` and its settings stay available, so reaching for the other
+  # provider is naming `GatewayApiSmsBackend` here and nothing else.
   #
   # ⚠️ This is a per-environment choice. Every Maestro flow authenticates by
   # reading the code out of the login response, so this host is one the e2e suite
   # cannot drive. Local and CI keep `RecordingSmsBackend`.
-  SMS_BACKEND: "treffit_backend.notifications.sms.GatewayApiSmsBackend"
+  SMS_BACKEND: "treffit_backend.notifications.sms.SevenSmsBackend"
 
   # --- Telemetry -----------------------------------------------------------
   #
