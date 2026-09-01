@@ -88,7 +88,7 @@ spec:
             # edit, and a stale value here is worse than an absent one because it
             # attributes a new build's errors to an old release.
             - name: SERVICE_VERSION
-              value: sha-ec3e1a9
+              value: sha-d7cff22
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
