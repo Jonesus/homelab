@@ -161,6 +161,41 @@ data:
   # cannot drive. Local and CI keep `RecordingSmsBackend`.
   SMS_BACKEND: "treffit_backend.notifications.sms.SevenSmsBackend"
 
+  # --- The accounts Google and Apple review the app on ---------------------
+  #
+  # A store reviewer has to sign in, and the line above is why they cannot:
+  # authentication is an SMS to a Finnish number, and nobody at Play Console or
+  # App Store Connect holds one. So these two make `+358123456789` accept
+  # `123456` every time, with no message sent, and `POST /api/auth/login`
+  # answers it with an empty body like every other number on this host.
+  #
+  # ⚠️ **THE CODE IS A PUBLISHED PASSWORD**, and belongs in git for that reason
+  # rather than in the sealed secret beside `SEVEN_API_KEY`. It goes in a store
+  # listing field, so everyone who can read that listing can sign into these
+  # accounts — sealing it would be theatre, and would hide the one value somebody
+  # auditing this file should see plainly.
+  #
+  # What makes that affordable: the accounts hold nothing worth reaching, the
+  # five-guess cap and five-minute expiry still apply because the code is stored
+  # as an ordinary `LoginCode`, and `confirm_login_code` is untouched. What it
+  # costs: the account is an ordinary participant in matching, so a profile
+  # nobody is behind can appear on a real user's platter, and a stranger with the
+  # listing in front of them can act as it. `users.store_review` argues both.
+  #
+  # Set together or not at all — the process refuses to start with one, because
+  # a number without a code is an account nobody can get into and no SMS goes to
+  # it to say so. Six digits exactly, since it is stored in a char(6) column.
+  #
+  # ⚠️ The accounts themselves are NOT created by this. After a rollout:
+  #
+  #     kubectl -n pilke exec deploy/pilke-api -c api -- \
+  #       python manage.py seed_store_review_accounts
+  #
+  # Idempotent, and a no-op while these are unset. Unset both and delete the
+  # accounts to close the door between submissions.
+  STORE_REVIEW_PHONE_NUMBERS: "+358123456789"
+  STORE_REVIEW_LOGIN_CODE: "123456"
+
   # --- Telemetry -----------------------------------------------------------
   #
   # `treffit_backend/telemetry.py` is a no-op when OTEL_EXPORTER_OTLP_ENDPOINT
