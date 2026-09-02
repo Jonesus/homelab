@@ -208,6 +208,14 @@ data:
   STORE_REVIEW_PHONE_NUMBERS: "+358123456789"
   STORE_REVIEW_LOGIN_CODE: "123456"
 
+  # NOTE: TESTER_PHONE_NUMBERS is deliberately NOT here. It names the accounts
+  # the seeded mock cast is kept matchable for — `manage.py match_partners` with
+  # no `--for`, run daily by `core.tasks.keep_testers_matchable` — and those are
+  # real people's mobile numbers, which this public repository is the wrong place
+  # for. It is in the sealed secret beside DJANGO_SUPERUSER_PHONE_NUMBER; the two
+  # numbers above are the exception because that one is invented and its code is
+  # published in a store listing on purpose.
+
   # --- Telemetry -----------------------------------------------------------
   #
   # `treffit_backend/telemetry.py` is a no-op when OTEL_EXPORTER_OTLP_ENDPOINT
