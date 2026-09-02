@@ -147,11 +147,22 @@ data:
   # every send and `SEVEN_LOW_BALANCE_EUROS` warns below it. That warning predicts
   # a total authentication outage, so it is worth alerting on rather than reading.
   #
-  # `SEVEN_SENDER` stays empty, leaving the account default. ⚠️ Since Traficom
-  # Order 28 L/2025 an unregistered sender ID towards a Finnish number displays as
-  # `Tuntematon`, and from 2 November 2026 the message is blocked or labelled
-  # `Roskaposti` — a deadline rather than a cosmetic. `SEVEN_BASE_URL` stays
-  # unset: seven.io runs one platform, so there is no wrong host to pick.
+  # ⚠️ `SEVEN_SENDER` must be set to something, and empty is the one value that
+  # does not work. Empty leaves the seven.io account default, which is the literal
+  # string `SMS`, and DNA drops it: measured on a correctly routed send to a DNA
+  # subscriber, `SMS` sat at TRANSMITTED and never arrived while `Pilke` to the
+  # same handset was delivered in three seconds. The value itself is invisible —
+  # since Traficom Order 28 L/2025 an unregistered sender ID towards a Finnish
+  # number is blocked or rewritten to `Tuntematon` from 4 May 2026 and additionally
+  # labelled `Roskaposti` from 2 November 2026, and `Pilke` does arrive as
+  # `Tuntematon`. So the login copy has to name the app, and registration (€200/yr,
+  # must match the YTJ business name) buys the handset label rather than delivery.
+  #
+  # `SEVEN_MNP_LOOKUP` stays unset, which is on: the backend asks seven.io which
+  # network each number is on before texting it, at €0.005 a lookup. Without it,
+  # three codes for a DNA subscriber were submitted to Elisa and none arrived.
+  # `SEVEN_BASE_URL` stays unset: seven.io runs one platform, so there is no wrong
+  # host to pick.
   #
   # `GATEWAYAPI_TOKEN` and its settings stay available, so reaching for the other
   # provider is naming `GatewayApiSmsBackend` here and nothing else.
@@ -160,6 +171,7 @@ data:
   # reading the code out of the login response, so this host is one the e2e suite
   # cannot drive. Local and CI keep `RecordingSmsBackend`.
   SMS_BACKEND: "treffit_backend.notifications.sms.SevenSmsBackend"
+  SEVEN_SENDER: "Pilke"
 
   # --- The accounts Google and Apple review the app on ---------------------
   #
