@@ -30,7 +30,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: migrate
-          image: ghcr.io/boissit/treffit-backend:sha-8ba012d
+          image: ghcr.io/boissit/treffit-backend:sha-e7505ef
           command:
             - sh
             - -c
@@ -45,6 +45,27 @@ spec:
               # is why it belongs in every release rather than in somebody's
               # memory of the first one.
               python manage.py createcachetable
+              # The venue catalogue (pilke-app#53), on exactly `createcachetable`'s
+              # reasoning: idempotent, and it belongs in every release rather than
+              # in somebody's memory of the first one. An `Activity` table this
+              # deployment forgot is not a visible failure — `GET /api/candidates`
+              # filters on venue overlap, so every draw would answer its ordinary
+              # 404 "nobody compatible" for every user for ever, which reads as a
+              # matching problem rather than as missing content.
+              #
+              # ⚠️ The catalogue in `core/venues.py` is the authority, so a re-run
+              # re-asserts it: a venue's date categories are set back to the
+              # catalogue's on every deploy, and a catalogue venue deleted by hand
+              # comes back. Venues *outside* the catalogue are left alone and
+              # reported. Editing a catalogue venue is therefore a code change,
+              # which is the point of it being in code.
+              #
+              # It refuses rather than half-writes: a duplicate name, a bad price
+              # band or a row with no category is reported before anything is
+              # written, and a seeded venue that ends up with no categories rolls
+              # the transaction back. A failure here fails the Argo sync and leaves
+              # the old pods serving, which is the behaviour this Job is for.
+              python manage.py seed_venues
           envFrom:
             - configMapRef:
                 name: pilke-config
