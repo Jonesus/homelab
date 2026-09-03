@@ -41,7 +41,7 @@ spec:
           # commit that changes the command, or gunicorn exits immediately with
           # a config file it cannot find and the API is down. CI does not build
           # this image — see ../README.md and treffit-backend/docs/releasing.md.
-          image: ghcr.io/boissit/treffit-backend:sha-93b2589
+          image: ghcr.io/boissit/treffit-backend:sha-8ba012d
           # The Dockerfile's CMD takes gunicorn's default of **one** worker,
           # which is one request at a time per pod. Fine for `docker compose` on
           # a laptop and not for the only API a beta has. Sync workers: reads of
@@ -88,7 +88,7 @@ spec:
             # edit, and a stale value here is worse than an absent one because it
             # attributes a new build's errors to an old release.
             - name: SERVICE_VERSION
-              value: sha-93b2589
+              value: sha-8ba012d
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
