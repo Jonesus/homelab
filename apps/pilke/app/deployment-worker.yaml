@@ -72,7 +72,7 @@ spec:
             # edit, and a stale value here is worse than an absent one because it
             # attributes a new build's errors to an old release.
             - name: SERVICE_VERSION
-              value: sha-47aeb35
+              value: sha-46156b2
             # ⚠️ The API does not need this and these two do. `telemetry.py`
             # builds the Resource, reads SERVICE_VERSION and puts
             # service.version on every span -- but only on the gunicorn path,
