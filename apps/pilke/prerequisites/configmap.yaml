@@ -314,3 +314,27 @@ data:
   # from everybody's platter, so at beta pool sizes that rule's cost falls on
   # the users it exists to protect.
 
+  # Which app builds this server still fits — `GET /api/app/version`. The app
+  # compares its own build number and shows a dismissible notice below
+  # `recommended`, or a wall with a store link below `minimum`.
+  # `pilke-app/docs/plans/native-update-prompt.md` is the design.
+  #
+  # These are the builds live in the stores today: Android `versionCode` 19 and
+  # iOS build 16, which are the same release — the two platforms count
+  # separately, and a marketing version cannot tell any build apart because
+  # every one of them says `1.0.0`.
+  #
+  # So a tester who has not updated is asked to; a tester on the current build
+  # is told nothing, which is the whole of what "up to date" looks like here.
+  #
+  # ⚠️ **APP_MINIMUM_BUILD_* stays unset, and unset means zero means nobody is
+  # blocked.** A minimum is a wall with no way past it, and it is only ever for
+  # what an `eas update` cannot fix: a native change, or a build whose runtime
+  # fingerprint no longer matches any published update and which therefore
+  # receives nothing at all. Anything an update can fix must be fixed that way.
+  #
+  # ⚠️ **And it may only be raised once the newer build is *live in both
+  # stores*** — not when it is submitted. In between, the wall would send people
+  # to a store that does not have the version it is demanding.
+  APP_RECOMMENDED_BUILD_ANDROID: "19"
+  APP_RECOMMENDED_BUILD_IOS: "16"
