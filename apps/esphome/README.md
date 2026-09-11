@@ -54,10 +54,46 @@ two pins and push an OTA update — no reflash, no opening the case.
 ## Reflashing from scratch
 
 Only needed if the device is bricked or the fallback AP is gone. Cloudcutter
-needs a spare WiFi adapter and has to run on a real (non-virtualised) host with
-NetworkManager, not in the cluster — see [tuya-cloudcutter][cc]. Recovering a
-device whose WiFi and fallback AP are both unreachable means opening the case
-and flashing the CB3S over serial with `ltchiptool`.
+cannot run in the cluster: it needs a spare WiFi adapter in AP mode on a real
+(non-virtualised) NetworkManager host. Build the firmware here, pull the UF2 out
+of the pod, then run [tuya-cloudcutter][cc] from a laptop on ethernet:
+
+```sh
+POD=$(kubectl -n homeassistant get pod -l app=esphome -o jsonpath='{.items[0].metadata.name}')
+kubectl -n homeassistant exec "$POD" -- esphome compile /config/ir-blaster-livingroom.yaml
+kubectl -n homeassistant cp \
+  "$POD:/config/.esphome/build/ir-blaster-livingroom/.pioenvs/ir-blaster-livingroom/firmware.uf2" \
+  ~/code/tuya-cloudcutter/custom-firmware/ir-blaster-livingroom.uf2
+
+cd ~/code/tuya-cloudcutter
+sudo ./tuya-cloudcutter.sh \
+  -p tuya-generic-universal-ir-remote-control-cb3s-v2.0.0 \
+  -f ir-blaster-livingroom.uf2 \
+  -w <wifi-interface>
+```
+
+The script power-cycles nothing itself — it prompts, and you toggle the device
+off and on 6 times (about a second apart) at two separate points to get it into
+AP mode. Slow blinking means it is there; fast blinking means repeat.
+
+Host caveats, all of which the script prompts about: it wants UDP 53, which
+`systemd-resolved` holds, and it disables `ufw` for the duration (re-enable with
+`sudo ufw enable`). If the exploit stalls where `hostapd` should come up,
+AppArmor is the usual culprit — answer yes to stopping it and reboot afterwards
+to get it back.
+
+Two upstream bugs need local patches to the cloudcutter clone's `Dockerfile`
+(both are commented in place there): Debian 11 has left LTS, so apt has to be
+pointed at `archive.debian.org`, and `Pipfile.lock` pins an `ltchiptool` that
+requires Python 3.10+ while the base image is 3.9 — without pinning it back to
+4.13.0 the UF2 is silently rejected as invalid for the chip.
+
+If the exploit itself fails, the device's firmware is probably not v2.0.0 any
+more. Run the script with no `-p` and pick "By firmware version and name"; the
+version is in the Smart Life app under the device's edit pencil → Device Update
+→ Main Module. A device patched against the exploit can only be flashed by
+opening the case and going at the CB3S over serial with `ltchiptool`, which is
+also the only way back if both WiFi and the fallback AP are unreachable.
 
 [cc]: https://github.com/tuya-cloudcutter/tuya-cloudcutter
 [dev]: https://devices.esphome.io/devices/tuya-generic-wifi-ir-remote-control/
