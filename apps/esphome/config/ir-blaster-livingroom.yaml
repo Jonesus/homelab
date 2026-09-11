@@ -1,0 +1,100 @@
+# Tuya generic WiFi IR remote control — CB3S module (Beken BK7231N).
+# Stock firmware removed with tuya-cloudcutter using device profile
+# `tuya-generic-universal-ir-remote-control-cb3s-v2.0.0`.
+#
+# Pin map follows devices.esphome.io for this device. Board revisions of this
+# "generic" hardware disagree: the cloudcutter profile for it reports
+# infrr=24 / wfst_pin=7 (IR receive on P24, status LED on P7) instead. P26 for
+# IR transmit and P6 for the button are consistent across sources. If received
+# codes never show up in the logs, swap the receiver to P24 and the status LED
+# to P7 and push an OTA update — no reflash needed.
+
+substitutions:
+  name: ir-blaster-livingroom
+  friendly_name: Living Room IR Blaster
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+
+bk72xx:
+  board: cb3s
+
+logger:
+
+api:
+  encryption:
+    key: !secret ir_blaster_livingroom_api_key
+  actions:
+    # Send a raw IR frame: alternating positive (mark) / negative (space)
+    # microsecond durations, exactly as remote_receiver dumps them.
+    - action: send_raw
+      variables:
+        code: int[]
+      then:
+        - remote_transmitter.transmit_raw:
+            code: !lambda "return code;"
+
+    # Send a Pronto hex string, the format used by most online IR code
+    # databases and by HA's own `remote.send_command` payloads.
+    - action: send_pronto
+      variables:
+        data: string
+      then:
+        - remote_transmitter.transmit_pronto:
+            data: !lambda "return data;"
+
+ota:
+  - platform: esphome
+    password: !secret ir_blaster_livingroom_ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Fallback AP so the device stays reachable if WiFi credentials go stale.
+  # Recovering over serial means opening the case, so keep this.
+  ap:
+    ssid: ${name}-fallback
+    password: !secret ir_blaster_livingroom_ota_password
+
+captive_portal:
+
+remote_receiver:
+  pin:
+    number: P7
+    inverted: true
+    mode: INPUT_PULLUP
+  # `dump: all` prints every decoded protocol to the logs — that is how you
+  # learn codes off an existing remote. Drop it to `[]` once you are done to
+  # cut the log noise.
+  dump: all
+  tolerance: 55%
+  filter: 10us
+  idle: 4ms
+  buffer_size: 2kb
+
+remote_transmitter:
+  pin: P26
+  carrier_duty_percent: 50%
+
+light:
+  - platform: status_led
+    name: Status LED
+    pin: P8
+    entity_category: diagnostic
+
+binary_sensor:
+  - platform: gpio
+    name: Button
+    pin:
+      number: P6
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+
+sensor:
+  - platform: wifi_signal
+    name: WiFi Signal
+    update_interval: 60s
+    entity_category: diagnostic

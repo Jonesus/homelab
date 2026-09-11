@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: esphome-config-pvc
+  namespace: homeassistant
+spec:
+  storageClassName: iscsi
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    # Holds the PlatformIO toolchains and per-device build trees. The LibreTiny
+    # (bk72xx) toolchain alone is a couple of GB once unpacked.
+    requests:
+      storage: 15Gi

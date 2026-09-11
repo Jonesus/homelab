@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: esphome
+  namespace: homeassistant
+spec:
+  replicas: 1
+  strategy:
+    # Single RWO PVC holding the build cache — never two pods at once.
+    type: Recreate
+  selector:
+    matchLabels:
+      app: esphome
+  template:
+    metadata:
+      labels:
+        app: esphome
+    spec:
+      containers:
+        - name: esphome
+          image: ghcr.io/esphome/esphome:2026.8.2
+          ports:
+            - name: http
+              containerPort: 6052
+          env:
+            # The dashboard's default online/offline check is mDNS, which does
+            # not cross the pod network boundary. Ping the device instead.
+            - name: ESPHOME_DASHBOARD_USE_PING
+              value: "true"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: secrets
+              mountPath: /config/secrets.yaml
+              subPath: secrets.yaml
+              readOnly: true
+            - name: devices
+              mountPath: /config/ir-blaster-livingroom.yaml
+              subPath: ir-blaster-livingroom.yaml
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              # Compiles are bursty and single-run; give them room.
+              cpu: "4"
+              memory: 4Gi
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: esphome-config-pvc
+        - name: secrets
+          secret:
+            secretName: esphome-secrets
+        - name: devices
+          configMap:
+            name: esphome-devices

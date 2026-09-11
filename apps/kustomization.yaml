@@ -15,6 +15,7 @@ resources:
   - hcpy/app.yaml
   - matter-server/app.yaml
   - homeassistant/app.yaml
+  - esphome/app.yaml
   - ha-mcp/app.yaml
   - zone-configurator/app.yaml
   - miniflux/app.yaml
