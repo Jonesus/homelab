@@ -30,7 +30,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: migrate
-          image: ghcr.io/boissit/treffit-backend:sha-be070b3
+          image: ghcr.io/boissit/treffit-backend:sha-166c938
           command:
             - sh
             - -c
@@ -66,6 +66,19 @@ spec:
               # the transaction back. A failure here fails the Argo sync and leaves
               # the old pods serving, which is the behaviour this Job is for.
               python manage.py seed_venues
+              # The post-date questionnaire's graph, on the same reasoning as the two
+              # above: idempotent, and it belongs in every release rather than in
+              # somebody's memory of the first one. ⚠️ It became load-bearing with
+              # `dates.meet_again`: the migration that retires the old `meet_again`
+              # answers leaves that question with **one** option on it, and the
+              # graph is what puts the three new ones back. A migrate-and-stop
+              # deploy therefore serves a consent question a user cannot consent
+              # with — and the question is the one that discloses a phone number.
+              #
+              # It writes copy only: `seed_feedback_graph` deletes an option nobody
+              # has answered and leaves every answered one alone, so a re-run cannot
+              # destroy a response.
+              python manage.py seed_feedback
           envFrom:
             - configMapRef:
                 name: pilke-config
