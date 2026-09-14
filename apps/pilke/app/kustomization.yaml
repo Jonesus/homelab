@@ -51,14 +51,20 @@ namespace: pilke
 configMapGenerator:
   - name: pilke-build-floor
     literals:
-      # Android `versionCode` 24 and iOS build 20 are the same release. The two
-      # platforms count separately and every build calls itself `1.0.0`, so
-      # these numbers are the whole of what "current" means.
-      - APP_MINIMUM_BUILD_ANDROID=24
-      - APP_MINIMUM_BUILD_IOS=20
+      # Android `versionCode` 25 and iOS build 21 are the same release: the move
+      # from the brand yellow to coral. The two platforms count separately and
+      # every build calls itself `1.0.0`, so these numbers are the whole of what
+      # "current" means.
+      #
+      # ⚠️ **This release is why the floor exists.** The launcher icon, the splash
+      # and the window behind the React views are native, so no `eas update` can
+      # carry it: a phone on 24/20 stays yellow until it takes a store build, and
+      # raising these is the only thing that asks it to.
+      - APP_MINIMUM_BUILD_ANDROID=25
+      - APP_MINIMUM_BUILD_IOS=21
       # Equal to the minimum, so the notice band is empty and anything below the
       # current build is walled rather than asked. The owner's call for a host
       # being tested by hand; on one with real users these should sit a release
       # or two above the minimum.
-      - APP_RECOMMENDED_BUILD_ANDROID=24
-      - APP_RECOMMENDED_BUILD_IOS=20
+      - APP_RECOMMENDED_BUILD_ANDROID=25
+      - APP_RECOMMENDED_BUILD_IOS=21
