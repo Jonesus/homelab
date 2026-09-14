@@ -69,6 +69,20 @@ spec:
           envFrom:
             - configMapRef:
                 name: pilke-config
+            # ⚠️ **Generated, so its name carries a content hash** — see the
+            # `configMapGenerator` in `kustomization.yaml`. Bumping a build floor
+            # therefore changes this reference, which changes the pod template,
+            # which is what makes Argo roll the Deployment on its own. A key in
+            # `pilke-config` does not: `envFrom` is resolved once at pod start
+            # and Argo does not restart anything because a ConfigMap it
+            # references changed.
+            #
+            # ⚠️ **On the API alone, and deliberately.** Only this Deployment
+            # serves `GET /api/app/version`; the worker and the scheduler never
+            # read these four values, so leaving them out is what stops a floor
+            # bump cycling two processes that do not care.
+            - configMapRef:
+                name: pilke-build-floor
             - secretRef:
                 name: pilke-app-secrets
           env:

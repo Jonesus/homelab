@@ -17,3 +17,48 @@ resources:
   - assets-route-public.yaml
 
 namespace: pilke
+
+# The build floor the app compares itself against — `GET /api/app/version`, and
+# `pilke-app/docs/plans/native-update-prompt.md` is the design.
+#
+# ⚠️ **A generator rather than four more keys in `pilke-config`, and the hash is
+# the whole point.** `envFrom` is resolved once at pod start and Argo does not
+# roll a Deployment because a ConfigMap it references changed — so a floor
+# bumped in `pilke-config` was live in git and dead in the cluster until
+# somebody remembered `kubectl rollout restart`. A generated name changes with
+# its content, so the reference in `deployment-api.yaml` changes with it, and
+# Argo rolls the pods because the pod template is genuinely different.
+#
+# ⚠️ **It cannot live in `prerequisites` with the rest of the configuration.**
+# That is a separate Argo Application, and kustomize only rewrites a generated
+# name inside the build that generated it: the ConfigMap would come out as
+# `pilke-config-<hash>` there while the Deployments here went on asking for
+# `pilke-config`, which is a name that would no longer exist. `pilke-config`
+# stays in `prerequisites` because `pilke-migrate` is a `PreSync` hook and needs
+# it to exist before this Application syncs at all; these four keys are not read
+# by that Job, so they are free to live here.
+#
+# ⚠️ **The numbers may only stand while those builds are *live in both
+# stores*** — not merely submitted. A finished `eas submit` is an upload: Play
+# may still be rolling out and App Store review may still be pending, and in
+# between the wall sends people to a store that does not have the version it
+# demands. Lower them and push; the gate is not persisted across launches and
+# the client fails open, so the correction reaches a phone on its next start.
+#
+# Read from EAS (`eas build:version:get --platform <p>`) rather than from
+# `app.config.ts`, which carries neither: `eas.json` sets `appVersionSource:
+# remote`, so the counter lives there.
+configMapGenerator:
+  - name: pilke-build-floor
+    literals:
+      # Android `versionCode` 24 and iOS build 20 are the same release. The two
+      # platforms count separately and every build calls itself `1.0.0`, so
+      # these numbers are the whole of what "current" means.
+      - APP_MINIMUM_BUILD_ANDROID=24
+      - APP_MINIMUM_BUILD_IOS=20
+      # Equal to the minimum, so the notice band is empty and anything below the
+      # current build is walled rather than asked. The owner's call for a host
+      # being tested by hand; on one with real users these should sit a release
+      # or two above the minimum.
+      - APP_RECOMMENDED_BUILD_ANDROID=24
+      - APP_RECOMMENDED_BUILD_IOS=20
