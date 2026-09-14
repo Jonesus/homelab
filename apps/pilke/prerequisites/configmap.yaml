@@ -319,22 +319,35 @@ data:
   # `recommended`, or a wall with a store link below `minimum`.
   # `pilke-app/docs/plans/native-update-prompt.md` is the design.
   #
-  # These are the builds live in the stores today: Android `versionCode` 19 and
-  # iOS build 16, which are the same release — the two platforms count
-  # separately, and a marketing version cannot tell any build apart because
-  # every one of them says `1.0.0`.
+  # The current release: Android `versionCode` 24 and iOS build 20. The two
+  # platforms count separately, and a marketing version cannot tell any build
+  # apart because every one of them says `1.0.0` — so these numbers, and not
+  # `version`, are the whole of what "current" means here.
   #
-  # So a tester who has not updated is asked to; a tester on the current build
-  # is told nothing, which is the whole of what "up to date" looks like here.
+  # Read from EAS rather than from `app.config.ts`, which carries neither:
+  # `eas.json` sets `appVersionSource: remote`, so the counter lives on EAS and
+  # `eas build:version:get --platform <p>` is what answers.
   #
-  # ⚠️ **APP_MINIMUM_BUILD_* stays unset, and unset means zero means nobody is
-  # blocked.** A minimum is a wall with no way past it, and it is only ever for
-  # what an `eas update` cannot fix: a native change, or a build whose runtime
+  # ⚠️ **`minimum` equals `recommended`, so the notice band is empty and anything
+  # below the current build is walled rather than asked.** That is the owner's
+  # call for a test host: there is no version of this app worth running but the
+  # newest one while it is being tested by hand. On a host with real users the
+  # two should differ — `recommended` a release or two back, `minimum` only as
+  # far as the oldest build that can still be repaired by an `eas update`.
+  #
+  # ⚠️ **A minimum is a wall with no way past it.** It is only ever for what an
+  # `eas update` cannot fix: a native change, or a build whose runtime
   # fingerprint no longer matches any published update and which therefore
   # receives nothing at all. Anything an update can fix must be fixed that way.
   #
-  # ⚠️ **And it may only be raised once the newer build is *live in both
-  # stores*** — not when it is submitted. In between, the wall would send people
-  # to a store that does not have the version it is demanding.
-  APP_RECOMMENDED_BUILD_ANDROID: "19"
-  APP_RECOMMENDED_BUILD_IOS: "16"
+  # ⚠️ **It may only stand while that build is *live in both stores*** — not
+  # merely submitted. A finished `eas submit` is an upload: Play may still be
+  # rolling out and App Store review may still be pending, and in between the
+  # wall sends people to a store that does not have the version it demands.
+  # Lower these two numbers and restart the pods if that turns out to be the
+  # case; the gate is not persisted across launches and the client fails open,
+  # so the fix reaches a phone on its next start.
+  APP_MINIMUM_BUILD_ANDROID: "24"
+  APP_MINIMUM_BUILD_IOS: "20"
+  APP_RECOMMENDED_BUILD_ANDROID: "24"
+  APP_RECOMMENDED_BUILD_IOS: "20"
