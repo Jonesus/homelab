@@ -44,12 +44,12 @@ To learn a code, open the device logs in the dashboard and press a button on the
 original remote; `dump: all` prints what it decoded. Once you have collected
 everything you need, set `dump: []` to quiet the logs down.
 
-**Pin map caveat:** revisions of this "generic" hardware disagree on pinout.
-The config follows [devices.esphome.io][dev] (IR receive P7, status LED P8),
-while the cloudcutter profile for the same device reports IR receive on P24 and
-the status LED on P7. IR transmit P26 and button P6 are consistent everywhere.
-If transmitting works but received codes never appear in the logs, swap those
-two pins and push an OTA update — no reflash, no opening the case.
+**Pin map:** revisions of this "generic" hardware genuinely differ.
+[devices.esphome.io][dev] documents IR receive on P7 and the status LED on P8;
+that was tried on this unit first and decoded nothing at all. The pin map in
+the cloudcutter profile — read out of the stock firmware, `infrr=24`,
+`wfst_pin=7` — is the one that matches, so receive is P24 and the LED is P7.
+IR transmit P26 and button P6 are consistent across both sources.
 
 ## Reflashing from scratch
 
