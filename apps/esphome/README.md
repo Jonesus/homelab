@@ -66,16 +66,32 @@ entity with a brightness level: the remote only sends relative steps and the
 candles report nothing back, so any level HA displayed would be a guess that
 desyncs the moment someone picks up the physical remote.
 
-**Pin map — every published source is wrong about the receive pin.**
-[devices.esphome.io][dev] documents receive on P7 with the status LED on P8;
-the cloudcutter profile's stock-firmware `device_configuration` says `infrr=24`
-with `wfst_pin=7`. Both were flashed and both decoded nothing at all, across
-several button presses each. A throwaway diagnostic build listening on eleven
-candidate GPIOs simultaneously (each with an `on_raw` trigger logging its own
-pin) showed IR frames landing on **P8** and on no other pin — a 66-pulse frame
-plus the 3-pulse repeat, every press. So receive is P8, and the status LED is
-left on P7 on the profile's authority, since P8 is demonstrably the receiver.
-Transmit P26 and button P6 are consistent across sources and work.
+**Pin map — worked out on the hardware, because the published sources are
+wrong.** The map that holds for this unit is:
+
+| Function | Pin |
+| --- | --- |
+| IR receive | P8 |
+| IR transmit | P7 |
+| Status / WiFi LED | P26 |
+| Button | P6 |
+
+[devices.esphome.io][dev] claims receive P7 / transmit P26 / LED P8, and the
+cloudcutter profile's stock-firmware `device_configuration` claims `infrr=24` /
+`infre=26` / `wfst_pin=7`. Neither receives anything, and transmitting on P26
+silently emits nothing — the action fires and logs "Sending remote code" while
+no photons leave the case, which is a deeply unhelpful failure mode.
+
+A throwaway diagnostic build listening on eleven candidate GPIOs at once (each
+an entry under `remote_receiver` with its own `id`, a small `buffer_size`, and
+an `on_raw` action logging its pin) found receive on **P8** and nowhere else,
+in one flash rather than one guess per OTA. That vindicated a third community
+mapping — P7 transmit, P8 receive, P24/P26 WiFi LED — whose transmit claim then
+proved correct too. Build that diagnostic again if another revision turns up.
+
+Note the trap: transmitting on the wrong pin looks like success in the logs.
+The device's own receiver does not hear its own transmissions either, so the
+only real confirmation is the target device responding.
 
 That diagnostic is worth rebuilding if another board revision turns up: a list
 of `remote_receiver` entries, each with a distinct `id`, a small `buffer_size`,
