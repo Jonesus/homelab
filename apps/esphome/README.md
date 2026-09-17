@@ -44,12 +44,21 @@ To learn a code, open the device logs in the dashboard and press a button on the
 original remote; `dump: all` prints what it decoded. Once you have collected
 everything you need, set `dump: []` to quiet the logs down.
 
-**Pin map:** revisions of this "generic" hardware genuinely differ.
-[devices.esphome.io][dev] documents IR receive on P7 and the status LED on P8;
-that was tried on this unit first and decoded nothing at all. The pin map in
-the cloudcutter profile — read out of the stock firmware, `infrr=24`,
-`wfst_pin=7` — is the one that matches, so receive is P24 and the LED is P7.
-IR transmit P26 and button P6 are consistent across both sources.
+**Pin map — every published source is wrong about the receive pin.**
+[devices.esphome.io][dev] documents receive on P7 with the status LED on P8;
+the cloudcutter profile's stock-firmware `device_configuration` says `infrr=24`
+with `wfst_pin=7`. Both were flashed and both decoded nothing at all, across
+several button presses each. A throwaway diagnostic build listening on eleven
+candidate GPIOs simultaneously (each with an `on_raw` trigger logging its own
+pin) showed IR frames landing on **P8** and on no other pin — a 66-pulse frame
+plus the 3-pulse repeat, every press. So receive is P8, and the status LED is
+left on P7 on the profile's authority, since P8 is demonstrably the receiver.
+Transmit P26 and button P6 are consistent across sources and work.
+
+That diagnostic is worth rebuilding if another board revision turns up: a list
+of `remote_receiver` entries, each with a distinct `id`, a small `buffer_size`,
+and an `on_raw` action logging its pin number, finds the answer in one flash
+instead of one guess per OTA.
 
 ## Reflashing from scratch
 
