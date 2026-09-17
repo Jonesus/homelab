@@ -64,14 +64,29 @@ remote_receiver:
     number: P8
     inverted: true
     mode: INPUT_PULLUP
-  # `dump: all` prints every decoded protocol to the logs — that is how you
-  # learn codes off an existing remote. Drop it to `[]` once you are done to
-  # cut the log noise.
-  dump: all
+  # Learning codes off an existing remote means reading these logs. `raw` is
+  # the one that always works — exact microsecond timings, replayable through
+  # the send_raw action whatever the protocol turns out to be — so it stays
+  # even though the named decoders are prettier when they do fire. rc_switch is
+  # deliberately absent: it "decodes" IR noise into all-zero payloads.
+  dump:
+    - raw
+    - nec
+    - samsung
+    - samsung36
+    - sony
+    - panasonic
+    - jvc
+    - lg
+    - rc5
+    - pronto
+  # 4ms was splitting single presses into three fragments — this protocol has
+  # gaps between its bursts. 20ms keeps a press together as one frame, and the
+  # bigger buffer holds it.
   tolerance: 55%
   filter: 10us
-  idle: 4ms
-  buffer_size: 2kb
+  idle: 20ms
+  buffer_size: 4kb
 
 remote_transmitter:
   pin: P26
