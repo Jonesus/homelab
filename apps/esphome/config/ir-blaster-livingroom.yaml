@@ -2,12 +2,14 @@
 # Stock firmware removed with tuya-cloudcutter using device profile
 # `tuya-generic-universal-ir-remote-control-cb3s-v2.0.0`.
 #
-# Pin map determined empirically — every published source is wrong about the
-# receive pin for this unit. devices.esphome.io says receive P7 / LED P8, and
-# the cloudcutter profile's stock-firmware config says infrr=24 / wfst_pin=7;
-# both decoded nothing. A diagnostic build listening on eleven GPIOs at once
-# showed IR frames arriving on P8 and nowhere else. Transmit P26 and button P6
-# are consistent across sources and confirmed working.
+# Pin map determined empirically; the published sources disagree and mostly
+# lose. devices.esphome.io says receive P7 / LED P8, the cloudcutter profile's
+# stock-firmware config says infrr=24 / wfst_pin=7 — a diagnostic build
+# listening on eleven GPIOs at once proved receive is P8 and nothing else.
+# That vindicated a third mapping (P7 send, P8 receive, P24/P26 WiFi LED),
+# which is why transmit is P7 here: transmitting on P26 fired the action but
+# emitted nothing the device's own receiver could hear. P6 button is the one
+# thing every source agrees on.
 
 substitutions:
   name: ir-blaster-livingroom
@@ -89,13 +91,13 @@ remote_receiver:
   buffer_size: 4kb
 
 remote_transmitter:
-  pin: P26
+  pin: P7
   carrier_duty_percent: 50%
 
 light:
   - platform: status_led
     name: Status LED
-    pin: P7
+    pin: P26
     entity_category: diagnostic
 
 binary_sensor:
