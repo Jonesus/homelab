@@ -40,9 +40,31 @@ Two API actions are exposed to Home Assistant:
 - `esphome.ir_blaster_livingroom_send_pronto` — takes `data`, a Pronto hex
   string, the format most online IR code databases use.
 
-To learn a code, open the device logs in the dashboard and press a button on the
-original remote; `dump: all` prints what it decoded. Once you have collected
-everything you need, set `dump: []` to quiet the logs down.
+To learn a code, open the device logs in the dashboard and press a button on
+the original remote. The dumpers print what they recognised; `raw` is the
+fallback that always works, since its microsecond timings replay through
+`send_raw` whatever the protocol. If a press arrives split into several
+fragments, `idle:` is shorter than the gaps between that protocol's bursts —
+raise it rather than trying to stitch the pieces together.
+
+Expect several dumpers to fire on one press: NEC, JVC and LG share enough
+timing that all three latch onto the same burst. Prefer the most specific
+decode, and confirm it against the Pronto header (`015B 00AF` is NEC's
+9ms/4.5ms preamble).
+
+Already mapped, from an LED candle remote (NEC, address `0xFF00`):
+
+| Button | Command |
+| --- | --- |
+| On | `0xFF00` |
+| Off | `0xFD02` |
+| Brighter | `0xED12` |
+| Dimmer | `0xEF10` |
+
+Those are exposed as four `button` entities. There is deliberately no light
+entity with a brightness level: the remote only sends relative steps and the
+candles report nothing back, so any level HA displayed would be a guess that
+desyncs the moment someone picks up the physical remote.
 
 **Pin map — every published source is wrong about the receive pin.**
 [devices.esphome.io][dev] documents receive on P7 with the status LED on P8;

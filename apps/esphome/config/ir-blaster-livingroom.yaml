@@ -108,6 +108,43 @@ binary_sensor:
         input: true
         pullup: true
 
+# LED candle remote — NEC, address 0xFF00, captured off the physical remote.
+# Brightness is step-only: the remote sends "one step brighter/dimmer" and the
+# candles report nothing back, so there is deliberately no level tracking here
+# and no light entity pretending to know a brightness. Four honest buttons.
+button:
+  - platform: template
+    name: Candles On
+    icon: mdi:candle
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xFF00
+
+  - platform: template
+    name: Candles Off
+    icon: mdi:candle
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xFD02
+
+  - platform: template
+    name: Candles Brighter
+    icon: mdi:brightness-plus
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xED12
+
+  - platform: template
+    name: Candles Dimmer
+    icon: mdi:brightness-minus
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xEF10
+
 sensor:
   - platform: wifi_signal
     name: WiFi Signal
