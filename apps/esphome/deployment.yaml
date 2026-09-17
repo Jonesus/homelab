@@ -27,6 +27,11 @@ spec:
             # not cross the pod network boundary. Ping the device instead.
             - name: ESPHOME_DASHBOARD_USE_PING
               value: "true"
+            # PlatformIO defaults to /root/.platformio, which is container
+            # storage — every pod roll threw away the toolchain and forced a
+            # multi-minute re-download on the next compile. Keep it on the PVC.
+            - name: PLATFORMIO_CORE_DIR
+              value: /config/.platformio
           volumeMounts:
             - name: config
               mountPath: /config
