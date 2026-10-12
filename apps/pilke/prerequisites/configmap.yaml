@@ -216,6 +216,20 @@ data:
   # numbers above are the exception because that one is invented and its code is
   # published in a store listing on purpose.
 
+  # --- The tester toolkit --------------------------------------------------
+  #
+  # The admin's *Testaus* section and the services behind it -- forcing a date
+  # between testers, moving its clock, staging a platter, topping up sparks,
+  # resetting a pair -- act only while this is on, and only for superusers.
+  # treffit-backend docs/testers.md is the whole of it.
+  #
+  # ⚠️ THIS IS THE KILL SWITCH FOR THE TOOLS, NOT FOR THE ISOLATION. Who is a
+  # tester is rows in the database, and a live user never sees a tester or the
+  # mock cast whatever this says. Setting it to "0" (or deleting the line) and
+  # restarting the pods is how to stop anybody forcing anything; it puts nobody
+  # back in the live pool.
+  TESTER_TOOLS_ENABLED: "1"
+
   # --- Telemetry -----------------------------------------------------------
   #
   # `treffit_backend/telemetry.py` is a no-op when OTEL_EXPORTER_OTLP_ENDPOINT
