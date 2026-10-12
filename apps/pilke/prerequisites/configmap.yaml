@@ -190,9 +190,11 @@ data:
   # What makes that affordable: the accounts hold nothing worth reaching, the
   # five-guess cap and five-minute expiry still apply because the code is stored
   # as an ordinary `LoginCode`, and `confirm_login_code` is untouched. What it
-  # costs: the account is an ordinary participant in matching, so a profile
-  # nobody is behind can appear on a real user's platter, and a stranger with the
-  # listing in front of them can act as it. `users.store_review` argues both.
+  # costs: a stranger with the listing in front of them can act as the account.
+  # It is in the tester toolkit's fixture cohort, so it is offered only the mock
+  # cast and testers and no real user ever sees it -- `seed_store_review_accounts`
+  # tags it, and treffit-backend `testers.0003` tagged the one already here.
+  # `users.store_review` argues both.
   #
   # Set together or not at all — the process refuses to start with one, because
   # a number without a code is an account nobody can get into and no SMS goes to
@@ -208,11 +210,10 @@ data:
   STORE_REVIEW_PHONE_NUMBERS: "+358123456789"
   STORE_REVIEW_LOGIN_CODE: "123456"
 
-  # NOTE: TESTER_PHONE_NUMBERS is deliberately NOT here. It names the accounts
-  # the seeded mock cast is kept matchable for — `manage.py match_partners` with
-  # no `--for`, run daily by `core.tasks.keep_testers_matchable` — and those are
-  # real people's mobile numbers, which this public repository is the wrong place
-  # for. It is in the sealed secret beside DJANGO_SUPERUSER_PHONE_NUMBER; the two
+  # NOTE: TESTER_PHONE_NUMBERS is deliberately NOT here. It names the people
+  # testing on this host — read by `manage.py match_partners` with no `--for` and
+  # by `manage.py tester add --roster`, both by hand — and those are real people's
+  # mobile numbers, which this public repository is the wrong place for. It is in the sealed secret beside DJANGO_SUPERUSER_PHONE_NUMBER; the two
   # numbers above are the exception because that one is invented and its code is
   # published in a store listing on purpose.
 

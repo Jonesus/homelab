@@ -82,10 +82,10 @@ stringData:
   DJANGO_SUPERUSER_DATE_LOCATION_PREFERENCE: "POINT(24.94 60.17)"
   DJANGO_SUPERUSER_DATE_LOCATION_PREFERENCE_RADIUS: "5"
 
-  # Whose platters the seeded mock cast is kept matchable for, space-separated
-  # and in +358 form. Read by `manage.py match_partners` with no `--for`, which
-  # `core.tasks.keep_testers_matchable` runs daily; empty or absent is off. The
-  # mock profiles are what get widened, never these accounts'.
+  # The people testing on this host, space-separated and in +358 form. Read by
+  # `manage.py match_partners` with no `--for` and `manage.py tester add
+  # --roster`, both run by hand; empty or absent is a no-op. The mock profiles are
+  # what get widened, never these accounts'.
   #
   # ⚠️ Here and not in `configmap.yaml`: these are real people's mobile numbers
   # and this repository is public, which is the same reason
