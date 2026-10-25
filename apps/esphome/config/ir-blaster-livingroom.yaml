@@ -185,6 +185,62 @@ button:
           address: 0xFE01
           command: 0xF50A
 
+# Switches rather than buttons, because voice assistants have no grammar for
+# "press" — Google only does turn on/off, and its exposed_domains list has no
+# button domain at all. `optimistic: true` because IR is write-only: the state
+# shown is what we last told the candles, not what they are. Pick up the
+# physical remote and HA will be wrong until the next press here.
+#
+# The two sets are transmitted back to back with a gap, so the receivers get
+# two clean frames rather than one run-on burst.
+switch:
+  - platform: template
+    name: All Candles
+    icon: mdi:candle
+    optimistic: true
+    turn_on_action:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xFF00
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFF00
+    turn_off_action:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xFD02
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFD02
+
+  - platform: template
+    name: Candles Power
+    icon: mdi:candle
+    optimistic: true
+    turn_on_action:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xFF00
+    turn_off_action:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xFD02
+
+  - platform: template
+    name: Tealights Power
+    icon: mdi:candle
+    optimistic: true
+    turn_on_action:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFF00
+    turn_off_action:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFD02
+
 sensor:
   - platform: wifi_signal
     name: WiFi Signal
