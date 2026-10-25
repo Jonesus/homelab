@@ -185,6 +185,34 @@ button:
           address: 0xFE01
           command: 0xF50A
 
+  - platform: template
+    name: Candles 4h Timer
+    icon: mdi:timer-outline
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xF906
+
+  - platform: template
+    name: Tealights 4h Timer
+    icon: mdi:timer-outline
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFB04
+
+  - platform: template
+    name: All Candles 4h Timer
+    icon: mdi:timer-outline
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xF906
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFB04
+
 # Switches rather than buttons, because voice assistants have no grammar for
 # "press" — Google only does turn on/off, and its exposed_domains list has no
 # button domain at all. `optimistic: true` because IR is write-only: the state
@@ -206,6 +234,18 @@ switch:
       - remote_transmitter.transmit_nec:
           address: 0xFE01
           command: 0xFF00
+      # Arm each set's own 4h timer right after switching on, so anything that
+      # turns the candles on from HA — dashboard, voice, automation — also
+      # guarantees they go out. The timer runs in the candles themselves, so it
+      # survives HA restarts and does not care that our state is assumed.
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xF906
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFB04
     turn_off_action:
       - remote_transmitter.transmit_nec:
           address: 0xFF00
@@ -223,6 +263,10 @@ switch:
       - remote_transmitter.transmit_nec:
           address: 0xFF00
           command: 0xFF00
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xF906
     turn_off_action:
       - remote_transmitter.transmit_nec:
           address: 0xFF00
@@ -236,6 +280,10 @@ switch:
       - remote_transmitter.transmit_nec:
           address: 0xFE01
           command: 0xFF00
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFB04
     turn_off_action:
       - remote_transmitter.transmit_nec:
           address: 0xFE01

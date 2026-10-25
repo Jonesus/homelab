@@ -60,12 +60,22 @@ Already mapped — two sets of LED candles, each with its own remote, both NEC:
 | Off | `0xFD02` | `0xFD02` |
 | Brighter | `0xED12` | `0xF40B` |
 | Dimmer | `0xEF10` | `0xF50A` |
+| 4h timer | `0xF906` | `0xFB04` |
 
 Same chip family, separated only by NEC address: the two remotes share their
 on/off command bytes outright. Their brightness commands do not match, so do
 not infer a second remote's codes from the first — capture every one.
 
-Those are exposed as eight `button` entities. There is deliberately no light
+Those are exposed as `button` entities, one per code, plus an "All Candles 4h
+Timer" that fires both.
+
+The three `switch` entities also arm each set's 4h timer immediately after
+switching on, so anything that turns the candles on from HA — dashboard, voice,
+an automation — guarantees they go out again. The timer runs inside the candles
+themselves, which is what makes this reliable: it survives a Home Assistant
+restart and does not depend on our assumed state being right. The trade is that
+HA can no longer turn the candles on indefinitely; only the physical remotes
+can do that. There is deliberately no light
 entity with a brightness level: the remote only sends relative steps and the
 candles report nothing back, so any level HA displayed would be a guess that
 desyncs the moment someone picks up the physical remote.
