@@ -1,0 +1,297 @@
+# Second Tuya generic WiFi IR remote control, CB3S / BK7231N — same hardware as
+# ir-blaster-livingroom, cloudcut with the same profile
+# `tuya-generic-universal-ir-remote-control-cb3s-v2.0.0`.
+#
+# The pin map is copied from the living room unit (transmit P7, receive P8,
+# button P6) because it is the same make. Do not trust that: "identical"
+# revisions of this hardware have already been caught disagreeing, which is why
+# the first unit's pins had to be found by sweeping GPIOs. If receive decodes
+# nothing or transmit emits nothing, rebuild the eleven-pin diagnostic
+# described in the README rather than guessing one pin at a time.
+#
+# Candle buttons are intentionally carried over: both sets answer the same NEC
+# codes, so whichever blaster is in range can drive them.
+
+substitutions:
+  name: ir-blaster-2
+  friendly_name: IR Blaster 2
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+
+bk72xx:
+  board: cb3s
+
+logger:
+
+api:
+  encryption:
+    key: !secret ir_blaster_2_api_key
+  actions:
+    # Send a raw IR frame: alternating positive (mark) / negative (space)
+    # microsecond durations, exactly as remote_receiver dumps them.
+    - action: send_raw
+      variables:
+        code: int[]
+      then:
+        - remote_transmitter.transmit_raw:
+            code: !lambda "return code;"
+
+    # Send a Pronto hex string, the format used by most online IR code
+    # databases and by HA's own `remote.send_command` payloads.
+    - action: send_pronto
+      variables:
+        data: string
+      then:
+        - remote_transmitter.transmit_pronto:
+            data: !lambda "return data;"
+
+ota:
+  - platform: esphome
+    password: !secret ir_blaster_2_ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Fallback AP so the device stays reachable if WiFi credentials go stale.
+  # Recovering over serial means opening the case, so keep this.
+  ap:
+    ssid: ${name}-fallback
+    password: !secret ir_blaster_2_ota_password
+
+captive_portal:
+
+remote_receiver:
+  pin:
+    number: P8
+    inverted: true
+    mode: INPUT_PULLUP
+  # Learning codes off an existing remote means reading these logs. `raw` is
+  # the one that always works — exact microsecond timings, replayable through
+  # the send_raw action whatever the protocol turns out to be — so it stays
+  # even though the named decoders are prettier when they do fire. rc_switch is
+  # deliberately absent: it "decodes" IR noise into all-zero payloads.
+  dump:
+    - raw
+    - nec
+    - samsung
+    - samsung36
+    - sony
+    - panasonic
+    - jvc
+    - lg
+    - rc5
+    - pronto
+  # 4ms was splitting single presses into three fragments — this protocol has
+  # gaps between its bursts. 20ms keeps a press together as one frame, and the
+  # bigger buffer holds it.
+  tolerance: 55%
+  filter: 10us
+  idle: 20ms
+  buffer_size: 4kb
+
+remote_transmitter:
+  pin: P7
+  carrier_duty_percent: 50%
+
+light:
+  - platform: status_led
+    name: Status LED
+    pin: P26
+    entity_category: diagnostic
+
+binary_sensor:
+  - platform: gpio
+    name: Button
+    pin:
+      number: P6
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+
+# Two sets of LED candles, each with its own remote, both NEC and both captured
+# off the physical remotes. They are the same chip family: the tealights answer
+# to address 0xFE01 against the candles' 0xFF00, and the two even share their
+# on/off command bytes — only the address separates them. The brightness
+# commands do differ between the remotes, so none of this is inferrable; every
+# code below was read off the air.
+#
+# Brightness is step-only on both: the remotes send "one step brighter/dimmer"
+# and the candles report nothing back, so there is deliberately no level
+# tracking here and no light entity pretending to know a brightness.
+button:
+  - platform: template
+    name: Candles On
+    icon: mdi:candle
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xFF00
+
+  - platform: template
+    name: Candles Off
+    icon: mdi:candle
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xFD02
+
+  - platform: template
+    name: Candles Brighter
+    icon: mdi:brightness-plus
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xED12
+
+  - platform: template
+    name: Candles Dimmer
+    icon: mdi:brightness-minus
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xEF10
+
+  - platform: template
+    name: Tealights On
+    icon: mdi:candle
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFF00
+
+  - platform: template
+    name: Tealights Off
+    icon: mdi:candle
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFD02
+
+  - platform: template
+    name: Tealights Brighter
+    icon: mdi:brightness-plus
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xF40B
+
+  - platform: template
+    name: Tealights Dimmer
+    icon: mdi:brightness-minus
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xF50A
+
+  - platform: template
+    name: Candles 4h Timer
+    icon: mdi:timer-outline
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xF906
+
+  - platform: template
+    name: Tealights 4h Timer
+    icon: mdi:timer-outline
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFB04
+
+  - platform: template
+    name: All Candles 4h Timer
+    icon: mdi:timer-outline
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xF906
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFB04
+
+# Switches rather than buttons, because voice assistants have no grammar for
+# "press" — Google only does turn on/off, and its exposed_domains list has no
+# button domain at all. `optimistic: true` because IR is write-only: the state
+# shown is what we last told the candles, not what they are. Pick up the
+# physical remote and HA will be wrong until the next press here.
+#
+# The two sets are transmitted back to back with a gap, so the receivers get
+# two clean frames rather than one run-on burst.
+switch:
+  - platform: template
+    name: All Candles
+    icon: mdi:candle
+    optimistic: true
+    turn_on_action:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xFF00
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFF00
+      # Arm each set's own 4h timer right after switching on, so anything that
+      # turns the candles on from HA — dashboard, voice, automation — also
+      # guarantees they go out. The timer runs in the candles themselves, so it
+      # survives HA restarts and does not care that our state is assumed.
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xF906
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFB04
+    turn_off_action:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xFD02
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFD02
+
+  - platform: template
+    name: Candles Power
+    icon: mdi:candle
+    optimistic: true
+    turn_on_action:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xFF00
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xF906
+    turn_off_action:
+      - remote_transmitter.transmit_nec:
+          address: 0xFF00
+          command: 0xFD02
+
+  - platform: template
+    name: Tealights Power
+    icon: mdi:candle
+    optimistic: true
+    turn_on_action:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFF00
+      - delay: 400ms
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFB04
+    turn_off_action:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFD02
+
+sensor:
+  - platform: wifi_signal
+    name: WiFi Signal
+    update_interval: 60s
+    entity_category: diagnostic

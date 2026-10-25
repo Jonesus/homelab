@@ -43,6 +43,10 @@ spec:
               mountPath: /config/ir-blaster-livingroom.yaml
               subPath: ir-blaster-livingroom.yaml
               readOnly: true
+            - name: devices
+              mountPath: /config/ir-blaster-2.yaml
+              subPath: ir-blaster-2.yaml
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /

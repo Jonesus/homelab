@@ -17,3 +17,4 @@ configMapGenerator:
   - name: esphome-devices
     files:
       - ir-blaster-livingroom.yaml=config/ir-blaster-livingroom.yaml
+      - ir-blaster-2.yaml=config/ir-blaster-2.yaml
