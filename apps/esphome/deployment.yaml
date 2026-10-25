@@ -32,6 +32,14 @@ spec:
             # multi-minute re-download on the next compile. Keep it on the PVC.
             - name: PLATFORMIO_CORE_DIR
               value: /config/.platformio
+            # ESPHome compiles through ccache, which defaults to
+            # /root/.cache/ccache — container storage, so every pod roll threw
+            # the object cache away and every build recompiled ESPHome from
+            # scratch (~7 minutes). Same trap as PLATFORMIO_CORE_DIR above.
+            # On the PVC it survives rolls, and most objects are shared between
+            # devices and across config tweaks.
+            - name: CCACHE_DIR
+              value: /config/.ccache
           volumeMounts:
             - name: config
               mountPath: /config
