@@ -110,10 +110,16 @@ binary_sensor:
         input: true
         pullup: true
 
-# LED candle remote — NEC, address 0xFF00, captured off the physical remote.
-# Brightness is step-only: the remote sends "one step brighter/dimmer" and the
-# candles report nothing back, so there is deliberately no level tracking here
-# and no light entity pretending to know a brightness. Four honest buttons.
+# Two sets of LED candles, each with its own remote, both NEC and both captured
+# off the physical remotes. They are the same chip family: the tealights answer
+# to address 0xFE01 against the candles' 0xFF00, and the two even share their
+# on/off command bytes — only the address separates them. The brightness
+# commands do differ between the remotes, so none of this is inferrable; every
+# code below was read off the air.
+#
+# Brightness is step-only on both: the remotes send "one step brighter/dimmer"
+# and the candles report nothing back, so there is deliberately no level
+# tracking here and no light entity pretending to know a brightness.
 button:
   - platform: template
     name: Candles On
@@ -146,6 +152,38 @@ button:
       - remote_transmitter.transmit_nec:
           address: 0xFF00
           command: 0xEF10
+
+  - platform: template
+    name: Tealights On
+    icon: mdi:candle
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFF00
+
+  - platform: template
+    name: Tealights Off
+    icon: mdi:candle
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xFD02
+
+  - platform: template
+    name: Tealights Brighter
+    icon: mdi:brightness-plus
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xF40B
+
+  - platform: template
+    name: Tealights Dimmer
+    icon: mdi:brightness-minus
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0xFE01
+          command: 0xF50A
 
 sensor:
   - platform: wifi_signal

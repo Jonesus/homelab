@@ -52,16 +52,20 @@ timing that all three latch onto the same burst. Prefer the most specific
 decode, and confirm it against the Pronto header (`015B 00AF` is NEC's
 9ms/4.5ms preamble).
 
-Already mapped, from an LED candle remote (NEC, address `0xFF00`):
+Already mapped — two sets of LED candles, each with its own remote, both NEC:
 
-| Button | Command |
-| --- | --- |
-| On | `0xFF00` |
-| Off | `0xFD02` |
-| Brighter | `0xED12` |
-| Dimmer | `0xEF10` |
+| Button | Candles (`0xFF00`) | Tealights (`0xFE01`) |
+| --- | --- | --- |
+| On | `0xFF00` | `0xFF00` |
+| Off | `0xFD02` | `0xFD02` |
+| Brighter | `0xED12` | `0xF40B` |
+| Dimmer | `0xEF10` | `0xF50A` |
 
-Those are exposed as four `button` entities. There is deliberately no light
+Same chip family, separated only by NEC address: the two remotes share their
+on/off command bytes outright. Their brightness commands do not match, so do
+not infer a second remote's codes from the first — capture every one.
+
+Those are exposed as eight `button` entities. There is deliberately no light
 entity with a brightness level: the remote only sends relative steps and the
 candles report nothing back, so any level HA displayed would be a guess that
 desyncs the moment someone picks up the physical remote.
