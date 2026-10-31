@@ -22,24 +22,24 @@ spec:
         controller:
           driver:
             enabled: true
-            # ⚠️ PINNED BY DIGEST, NOT `next`. A newer `next` refuses to send the
-            # TrueNAS API key over `ws://` ("unable to use apiKey over clear
-            # text"), and a controller that lands on a node without this build
-            # cached pulls it: every iSCSI volume then stops attaching. The way
-            # off the pin is the driver config speaking https/wss to the
-            # TrueNAS, then a released tag.
+            # ⚠️ A RELEASE, PINNED BY DIGEST, and the same one as the node plugin
+            # below. A floating tag (`next`, `latest`) is pulled afresh whenever
+            # a pod lands on a node that has not cached it, so a node drain can
+            # swap the storage driver for whatever was published that week; a
+            # `next` that refused the API key over plain http once stopped every
+            # iSCSI volume attaching. Bump both together, after a throwaway PVC
+            # has been provisioned, attached and written with the new one.
             image:
               registry: docker.io/democraticcsi/democratic-csi
-              tag: next@sha256:5b607d63a270330b4cdaa70ae961fc1484f0dda3d164d940e69e1faa213682fd
+              tag: v1.9.5@sha256:fc3b7d7ed3a616714139525075312758e23a5d425ffb539ad12c9bd20fb6001f
         node:
           hostPID: true
           driver:
-            # Pinned for the controller's reason above: the node plugin restarts
-            # with every node reboot, and `latest` with the chart's `Always`
-            # would pull whatever was published that day.
+            # The controller's release, for the controller's reason: this
+            # restarts with every node reboot, and the chart pulls `Always`.
             image:
               registry: docker.io/democraticcsi/democratic-csi
-              tag: latest@sha256:944d0e65077efbd9c1fdf23997eec8fac4b4bfb7c3de400f63e33a0a849c5ced
+              tag: v1.9.5@sha256:fc3b7d7ed3a616714139525075312758e23a5d425ffb539ad12c9bd20fb6001f
             extraEnv:
               - name: ISCSIADM_HOST_STRATEGY
                 value: nsenter
