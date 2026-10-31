@@ -1,0 +1,28 @@
+# The `internal-ca` certificate, delivered into `pilke` so barman-cloud can verify
+# the TLS listener in `apps/garage-backup`.
+#
+# ⚠️ THE LEAF CERTIFICATE IN THIS SECRET IS NEVER USED, AND THAT IS THE POINT OF
+# THE TRICK. A cert-manager CA issuer writes its own CA certificate into every
+# Secret it issues as `ca.crt`, and that key is the only one `object-store.yaml`
+# reads. Issuing a throwaway certificate here is the way to get the CA into this
+# namespace without trust-manager, without pasting the CA into git by hand, and
+# with renewal of the CA carried over for free.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: pilke-backup-endpoint-ca
+  namespace: pilke
+spec:
+  secretName: pilke-backup-endpoint-ca
+  # CNPG reloads a Secret carrying this label when it changes, instead of
+  # waiting for `kubectl cnpg reload`.
+  secretTemplate:
+    labels:
+      cnpg.io/reload: "true"
+  commonName: pilke-backup-endpoint-ca
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: internal-ca
+    kind: ClusterIssuer

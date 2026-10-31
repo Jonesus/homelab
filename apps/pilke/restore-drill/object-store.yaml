@@ -1,0 +1,44 @@
+# The same bucket as `../prerequisites/backup/object-store.yaml`, read from the
+# drill namespace. An ObjectStore is namespaced and a Cluster can only use one in
+# its own namespace, hence the copy.
+#
+# ⚠️ NO `retentionPolicy`, AND IT MUST NOT GAIN ONE. Retention deletes backups,
+# and these are production's. The production ObjectStore owns retention; a second
+# one with a different window would be a second process pruning the same bucket.
+#
+# The two Secrets it names are copied in from `pilke` by the first step of the
+# runbook.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: pilke-postgres-qnap
+  namespace: pilke-restore-drill
+spec:
+  configuration:
+    destinationPath: s3://pilke-postgres/
+    endpointURL: https://garage-backup.garage-backup.svc.cluster.local:3443
+    endpointCA:
+      name: pilke-backup-endpoint-ca
+      key: ca.crt
+    s3Credentials:
+      accessKeyId:
+        name: pilke-backup-s3
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: pilke-backup-s3
+        key: ACCESS_SECRET_KEY
+      region:
+        name: pilke-backup-s3
+        key: ACCESS_REGION
+    wal:
+      compression: gzip
+      maxParallel: 2
+    data:
+      compression: gzip
+      jobs: 2
+  instanceSidecarConfiguration:
+    env:
+      - name: AWS_REQUEST_CHECKSUM_CALCULATION
+        value: when_required
+      - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+        value: when_required

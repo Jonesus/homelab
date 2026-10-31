@@ -1,0 +1,25 @@
+# A patch on `../database.yaml`'s Cluster, applied from `../kustomization.yaml`:
+# turns on WAL archiving and base backups through the Barman Cloud plugin, into
+# `object-store.yaml`.
+#
+# ⚠️ APPLYING THIS RESTARTS THE DATABASE. The plugin runs as a sidecar in the
+# instance pod, so adding it is a new pod spec, and with `instances: 1` that is
+# the primary going away and coming back: tens of seconds, longer if the new pod
+# lands on another node and the iSCSI volume has to move. A Tuesday morning, as
+# `../../README.md` asks of maintenance.
+#
+# A patch rather than an edit to `database.yaml` so that turning this on and off
+# is one line in `../kustomization.yaml`, the same line as the rest of `backup/`.
+# Fold it into `database.yaml` once it has been live for a while.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pilke-postgres
+  namespace: pilke
+spec:
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      # The WAL archiver, and the only one: a cluster has at most one.
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: pilke-postgres-qnap

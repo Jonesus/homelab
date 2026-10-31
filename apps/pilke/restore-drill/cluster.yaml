@@ -1,0 +1,46 @@
+# A restored copy of `pilke-postgres`: the latest base backup, then every archived
+# WAL segment after it, so the result is production as of its last archived
+# segment — at most `archive_timeout` (CNPG's default, five minutes) behind.
+#
+# For a point in time instead, use `cluster-pitr.yaml`, which is this file plus a
+# `recoveryTarget`.
+#
+# ⚠️ NO `plugins:` SECTION, AND THAT IS WHAT KEEPS THIS A DRILL. With one, this
+# cluster would start archiving its own WAL into the same bucket. The
+# `externalClusters` entry below is read-only: it is where the restore reads
+# from, and nothing else.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pilke-postgres-drill
+  namespace: pilke-restore-drill
+spec:
+  # The production image exactly. A restore replays WAL that references PostGIS
+  # objects, and the major version has to match the backup's.
+  imageName: ghcr.io/cloudnative-pg/postgis:17-3.5-9
+  instances: 1
+
+  bootstrap:
+    recovery:
+      source: pilke-postgres
+
+  externalClusters:
+    - name: pilke-postgres
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: pilke-postgres-qnap
+          # The production Cluster's name, which is the path the backups are
+          # under: `s3://pilke-postgres/pilke-postgres/`.
+          serverName: pilke-postgres
+
+  # `iscsi` is the TrueNAS box, which is fine for a drill and is the open
+  # question for a real disaster: see "When it is not a drill" in README.md.
+  storage:
+    pvcTemplate:
+      storageClassName: iscsi
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi

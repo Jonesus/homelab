@@ -184,7 +184,8 @@ Each step's check is what says it worked.
    curl -si https://api.pilke.app/api/auth/login -d '{"phone_number":"+3584..."}'
    # and a second request 5 seconds later must be a 429
    ```
-5. **Rehearse a restore**, below, before any real user exists.
+5. **Turn on backups and rehearse a restore** before any real user exists:
+   "Backups" below, then [`restore-drill/README.md`](restore-drill/README.md).
 6. **Point the app at it.** `EXPO_PUBLIC_API_URL` is inlined into the JS bundle
    at build time, so it is a build input rather than configuration: set the repo
    variable in `pilke-app` to `https://api.pilke.app` and rebuild.
@@ -223,24 +224,131 @@ kubectl -n pilke exec deploy/pilke-api -c api -- printenv SMS_BACKEND
 
 Migrations do not un-apply when you revert the tag. Keep them
 backwards-compatible — additive columns, no drop in the same release that stops
-writing them — and for anything destructive, take a dump first: the rollback is
-restore-from-dump, not `git revert`.
+writing them — and for anything destructive, take a backup first: the rollback
+is a restore, not `git revert`.
+
+```bash
+kubectl cnpg backup pilke-postgres -n pilke \
+  --method=plugin --plugin-name=barman-cloud.cloudnative-pg.io
+```
+
+With WAL archiving on, a restore to the minute before the migration is possible
+without one, but an explicit backup makes that restore start from a base backup
+seconds old instead of hours old.
+
+## Backups
+
+⚠️ **Not on until the steps below have been done.** Until `- backup` is
+uncommented in `prerequisites/kustomization.yaml` there are none, and that must
+not still be true when a real person registers: a beta that loses its users'
+data does not get a second beta.
+
+WAL archiving and a nightly base backup, through CloudNativePG's Barman Cloud
+plugin (`infrastructure/cnpg-barman-cloud`), into a Garage on the **QNAP**
+(`apps/garage-backup`). The database's own volume is on the TrueNAS, so either
+NAS can be lost. Recovery is to any moment in the last 30 days, and at most
+about five minutes of writes behind the failure (CNPG's default
+`archive_timeout`). `prerequisites/backup/object-store.yaml` argues each
+setting, and [`restore-drill/README.md`](restore-drill/README.md) is the
+restore.
+
+⚠️ **A failing archive fills the database's disk.** Postgres keeps every WAL
+segment it has not archived, on its 10Gi volume, so a QNAP that is down for days
+is eventually a Pilke outage. Check after anything touching the backup path:
+
+```bash
+kubectl cnpg status pilke-postgres -n pilke     # last archived WAL recent, no failures
+kubectl -n pilke get backups                    # tonight's, completed
+```
+
+Turning it on, once, in this order:
+
+1. **The store.** `apps/garage-backup/README.md`: the directory on the QNAP, its
+   sealed secret, the two Applications, then the bootstrap that mints the key.
+2. **The key.** `prerequisites/backup/backup-s3.unsealed.yaml` is gitignored:
+
+   ```yaml
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: pilke-backup-s3
+     namespace: pilke
+     labels:
+       cnpg.io/reload: "true"   # CNPG picks up a rotated key without a restart
+   type: Opaque
+   stringData:
+     ACCESS_KEY_ID: ""       # from `garage key create pilke-postgres`
+     ACCESS_SECRET_KEY: ""
+     ACCESS_REGION: "garage"
+   ```
+3. **Prove the store** with an empty throwaway cluster, "Before production
+   depends on it" in `restore-drill/README.md`. This is the step that finds a
+   barman-cloud and Garage disagreement before the production WAL does.
+4. **Seal and switch on**, in a maintenance window, because adding the plugin's
+   sidecar restarts the single instance:
+
+   ```bash
+   ./apps/pilke/create-secrets.bash        # seals only what has an unsealed file
+   rm apps/pilke/prerequisites/backup/backup-s3.unsealed.yaml
+   ```
+
+   Then, in one commit with `prerequisites/backup/backup-s3.sealed.yaml`:
+   uncomment `- backup` and the `patches:` block in
+   `prerequisites/kustomization.yaml`. After the sync, `kubectl -n pilke get
+   backups` shows the `immediate` backup running, then completed.
+5. **The drill**, the same day: [`restore-drill/README.md`](restore-drill/README.md).
+
+## Network policies
+
+`prerequisites/network-policy/`, in two stages, and **whether either does
+anything depends on the CNI**: read that directory's `kustomization.yaml` before
+assuming they are enforced.
+
+- **Stage 1, live:** ingress-only policies on the database and on the two
+  telemetry stores. The database answers the four application processes, the
+  operator and its own instances; the stores answer the collector, Grafana and
+  their vmalert.
+- **Stage 2, staged:** the namespace-wide default deny, ingress and egress, and
+  the allow rules that make it survivable. Five files, one commit.
+
+Check stage 1 the day enforcement is on. Run the probe once **before** as well:
+it must say OPEN then, or it proves nothing when it says closed afterwards.
+
+```bash
+# Denied: a pod in another namespace must NOT reach Postgres or the stores.
+kubectl run np-probe -n default --rm -i --restart=Never --image=busybox:1.37 -- sh -c '
+  nc -w 3 pilke-postgres-rw.pilke 5432 </dev/null && echo "postgres OPEN" || echo "postgres closed"
+  wget -q -T 3 -O /dev/null http://vlsingle-pilke.pilke:9428/health && echo "logs OPEN" || echo "logs closed"
+  wget -q -T 3 -O /dev/null http://vtsingle-pilke.pilke:10428/health && echo "traces OPEN" || echo "traces closed"'
+# Allowed: the API still reaches its database.
+kubectl -n pilke exec deploy/pilke-api -c api -- python -c \
+  "import socket; socket.create_connection(('pilke-postgres-rw', 5432), 3); print('ok')"
+kubectl cnpg status pilke-postgres -n pilke     # the operator still sees the instance
+```
+
+Then stage 2, after backups are on so the drill can re-prove the backup path
+through it. Afterwards: Grafana loads and shows fresh logs and traces, a login
+SMS arrives, a push arrives, `kubectl cnpg status` shows WAL still archiving,
+and an alert reaches the phone.
 
 ## What this deployment does not give you
 
-- ⚠️ **Backups. There are none.** Nothing dumps the database, nothing snapshots
-  its volume, and nothing mirrors the photographs out of Garage. That is
-  deliberate for a first sync and **must not still be true when a real person
-  registers** — a beta that loses its users' data does not get a second beta.
-  The follow-up adds them, along with the restore drill that is the actual
-  deliverable.
+- ⚠️ **Backups of the photographs.** The database's are "Backups" above, once
+  switched on; nothing mirrors Garage's `assets` bucket anywhere, so losing the
+  TrueNAS loses every profile photograph even after the database is restored.
+- **A backup alarm.** A backup that fails says so in `kubectl cnpg status` and
+  in the Backup object, and nowhere that reaches a phone. A dead-man's-switch
+  ping on the nightly backup is still owed: a silently failing backup is how
+  backups actually fail.
 - **One of everything that holds state.** The API runs two replicas and rolls
   without downtime, but `pilke-postgres`, Garage, the worker and the scheduler
   are single and their restarts are visible. The database is the one that
   matters: a node drain moves it, and it cannot come back until the iSCSI volume
   detaches and reattaches.
-- **One NAS.** The database volume, Garage's volume and the backups are all on
-  it. This protects against a bad migration, not against losing the box.
+- **Two NAS boxes in one building.** The database and Garage are on the
+  TrueNAS and the backups are on the QNAP, which survives either box failing and
+  not the building. No offsite copy yet: `apps/garage-backup/README.md` has the
+  cheapest next step.
 - **No monitoring from outside the cluster.** Telemetry itself is here —
   `observability.yaml` and `observability-charts.yaml` deploy VictoriaLogs,
   VictoriaTraces, Grafana at `pilke-o11y.internal` and five alert rules that
@@ -248,11 +356,12 @@ restore-from-dump, not `git revert`.
   is report on losing the thing it runs on: its volumes are on the same NAS as
   the database, its dead man's switch dies with the cluster, and when the ISP is
   down so is every part of it. So the **external** uptime check on
-  `https://api.pilke.app/healthz` is still owed, plus a dead-man's-switch ping
-  from the backup CronJob, since a silently failing backup is how backups
-  actually fail.
-- **No offsite copy**, and no answer yet on whether the disks are encrypted at
-  rest. The second one changes what the privacy statement can honestly claim.
+  `https://api.pilke.app/healthz` is still owed.
+- **No answer yet on whether either NAS encrypts its disks at rest**, and the
+  backups are not encrypted by anything above the disk either
+  (`apps/garage-backup/README.md` has the SSE-C path). This changes what the
+  privacy statement can honestly claim, and so does the backups' 30-day window:
+  a deleted account stays in them until it ages out.
 
 This app arranges in-person meetings between strangers. If the backend is down
 at 19:40 on a Friday, somebody standing outside a bar cannot check where their

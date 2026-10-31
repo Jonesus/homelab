@@ -11,6 +11,12 @@ spec:
   imageName: ghcr.io/cloudnative-pg/postgis:17-3.5-9
   instances: 1
 
+  # ⚠️ NOT NECESSARILY THE WHOLE CLUSTER. WAL archiving and base backups are a
+  # patch, `backup/cluster-archiving.yaml`, applied from `kustomization.yaml`
+  # once backups are switched on there; from then the rendered Cluster carries a
+  # `plugins:` section this file does not show. `../restore-drill/` restores
+  # from what it writes.
+
   postgresql:
     enableAlterSystem: true
 
