@@ -1,0 +1,62 @@
+# Who may reach the backups: the Postgres pods that write and restore them, and
+# nothing else.
+#
+# This store holds a complete copy of Pilke's database, so it is the second most
+# valuable thing in the cluster after the database itself, and its only lock
+# otherwise is a SigV4 key. The audit found every Pilke store reachable from any
+# pod in the cluster (I-05); this namespace starts out the other way round.
+#
+# ⚠️ INERT UNTIL THE CNI ENFORCES NETWORKPOLICY. See
+# `apps/pilke/prerequisites/network-policy/kustomization.yaml` for how to check
+# and how to turn enforcement on. Writing these first is deliberate: the day it
+# is on, this namespace is already closed.
+#
+# The kubelet's probes are not affected: every enforcing implementation this
+# cluster would use exempts the node's own traffic to its pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: garage-backup
+spec:
+  podSelector: {}
+  # Egress too, and nothing re-allows it. Garage here resolves no names and
+  # dials nothing: the NFS mount is the kubelet's, made from the node, and is
+  # not pod traffic.
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: s3-from-postgres
+  namespace: garage-backup
+spec:
+  podSelector:
+    matchLabels:
+      app: garage-backup
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # Any CNPG pod in the two namespaces that restore from these backups:
+        # the instance (WAL archive, base backups, retention) and the recovery
+        # Job a bootstrap runs. `cnpg.io/cluster` is set on both by the
+        # operator. `pilke-restore-drill` is where
+        # `apps/pilke/restore-drill/` rehearses a restore, and it is empty
+        # between drills.
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - pilke
+                  - pilke-restore-drill
+          podSelector:
+            matchExpressions:
+              - key: cnpg.io/cluster
+                operator: Exists
+      ports:
+        - protocol: TCP
+          port: 3443

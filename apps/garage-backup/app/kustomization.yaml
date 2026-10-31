@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - configmap.yaml
+  - certificate.yaml
+  - data-pv.yaml
+  - data-pvc.yaml
+  - statefulset.yaml
+  - service.yaml
+  - network-policy.yaml
+
+namespace: garage-backup

@@ -1,0 +1,33 @@
+# The QNAP (192.168.1.103, a TS-469 Pro), and not the TrueNAS box the database
+# is on. That difference is this volume's only job, so check it before changing
+# anything here: the same server and the `/cluster/<app>` layout as
+# `../../calibre/share-pv.yaml` and `../../paperless/prerequisites/documents-pv.yaml`.
+#
+# ⚠️ THE DIRECTORY HAS TO EXIST ON THE NAS FIRST, writable by uid 1000, and the
+# export should admit the cluster nodes and nothing else. Until it exists the
+# pod sits in ContainerCreating with a mount error in its events.
+# `../README.md` has the steps.
+#
+# NFS rather than an iSCSI LUN on the same NAS, although Garage's metadata would
+# rather be on a block device: the QNAP's LUNs were retired in 26db777 and NFS is
+# what this cluster still uses it for. The metadata engine in `configmap.yaml`
+# is chosen for this.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: garage-backup-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # Retain, so pruning these objects can never be what deletes the backups. NFS
+  # has no provisioner that would delete them anyway; this says so.
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    server: 192.168.1.103
+    path: /cluster/pilke-backup
+  mountOptions:
+    - nfsvers=4
+  # Nominal: NFS does not enforce it. The ceiling that matters is the capacity
+  # given to `garage layout assign`, which must not exceed the share's free space.
+  capacity:
+    storage: 200Gi

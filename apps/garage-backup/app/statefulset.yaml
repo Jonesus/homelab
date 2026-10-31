@@ -1,0 +1,170 @@
+# A second Garage, on the other NAS: the object store CloudNativePG archives
+# `pilke-postgres` into. `../README.md` is why it exists and how to bootstrap it.
+#
+# ⚠️ THE OTHER NAS IS THE WHOLE POINT. The database's volume is democratic-csi
+# `iscsi`, which is the TrueNAS box, and so is `../../garage`'s. This one's
+# volume is an NFS export from the QNAP (`data-pv.yaml`), so losing either box
+# leaves one copy. Moving this volume onto `iscsi` would keep every manifest
+# valid and quietly put the backups back on the disk they are backing up.
+#
+# A separate Garage rather than a bucket on the existing one, for that reason:
+# Garage has no per-bucket placement, so a bucket on `../../garage` lands on the
+# TrueNAS whatever it is called.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: garage-backup
+  namespace: garage-backup
+  labels:
+    app: garage-backup
+spec:
+  serviceName: garage-backup
+  replicas: 1
+  selector:
+    matchLabels:
+      app: garage-backup
+  template:
+    metadata:
+      labels:
+        app: garage-backup
+    spec:
+      securityContext:
+        # ⚠️ fsGroup does nothing to an NFS volume: the kubelet does not chown
+        # one. The export's directory has to be writable by uid 1000 on the QNAP
+        # side, and a pod that cannot write it fails at startup with a
+        # permission error on `/var/lib/garage/meta`.
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      # Nothing in here talks to the Kubernetes API.
+      automountServiceAccountToken: false
+      containers:
+        - name: garage
+          # The same release as `../../garage`, so one set of CLI syntax in two
+          # READMEs. Bump them together.
+          image: dxflrs/garage:v2.3.0
+          env:
+            - name: GARAGE_RPC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: garage-backup-secrets
+                  key: rpc-secret
+            - name: GARAGE_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: garage-backup-secrets
+                  key: admin-token
+            - name: TZ
+              value: Europe/Helsinki
+          ports:
+            - name: admin
+              containerPort: 3903
+          # As in `../../garage`: the admin API answers before a layout exists,
+          # so the pod is Ready on a fresh install and the bootstrap is a
+          # separate, visible step rather than a pod that never comes up.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3903
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3903
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          volumeMounts:
+            - name: config
+              mountPath: /etc/garage.toml
+              subPath: garage.toml
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/garage
+            # Sqlite's temporary files, which the read-only root filesystem
+            # would otherwise refuse: the daily metadata snapshot is one.
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+        # The TLS listener. Garage speaks plain HTTP and binds its S3 API to
+        # loopback (`configmap.yaml`), so this is the only way into the store.
+        #
+        # ⚠️ WHAT THIS ENCRYPTS AND WHAT IT DOES NOT. It covers the hop from the
+        # Postgres pod to here, which carries the S3 credentials and every WAL
+        # segment across the pod network. It does not cover the hop from here
+        # to the QNAP: that is NFSv4 with `sys` auth, in the clear on the LAN,
+        # and the objects are not encrypted at rest by Garage either. Both are
+        # recorded in `../README.md`; the fix for both is SSE-C, which needs
+        # this listener to exist first because the key travels in a header.
+        - name: tls
+          image: ghostunnel/ghostunnel:v1.11.5-distroless
+          args:
+            - server
+            - --listen=0.0.0.0:3443
+            - --target=127.0.0.1:3900
+            - --cert=/tls/tls.crt
+            - --key=/tls/tls.key
+            # No client certificates: barman-cloud authenticates with SigV4
+            # and cannot present one. Who may connect at all is the
+            # NetworkPolicy's job.
+            - --disable-authentication
+            # cert-manager renews the Secret in place and the kubelet updates
+            # the mounted files; this is what makes the process read them again.
+            - --timed-reload=1h
+            # The liveness probe is a bare TCP connect, which is a failed
+            # handshake every thirty seconds otherwise.
+            - --quiet=handshake-errs
+          ports:
+            - name: s3-tls
+              containerPort: 3443
+          livenessProbe:
+            tcpSocket:
+              port: 3443
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+      volumes:
+        - name: config
+          configMap:
+            name: garage-backup
+        - name: tls
+          secret:
+            secretName: garage-backup-tls
+            defaultMode: 0440
+        - name: data
+          persistentVolumeClaim:
+            claimName: garage-backup-data
+        - name: tmp
+          emptyDir: {}
