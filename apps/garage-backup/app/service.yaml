@@ -12,6 +12,11 @@ metadata:
   namespace: garage-backup
 spec:
   clusterIP: None
+  # In DNS whether Ready or not. Garage's metadata is SQLite on NFS, so
+  # `/health` stalls behind a base backup's writes; with one replica, an unready
+  # pod drops out of this headless name and the upload in flight fails with
+  # "Could not connect". Readiness stays useful as a signal, not as a gate.
+  publishNotReadyAddresses: true
   selector:
     app: garage-backup
   ports:

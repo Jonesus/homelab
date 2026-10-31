@@ -69,12 +69,15 @@ spec:
           # is bound to loopback where the kubelet cannot reach it. A liveness
           # probe on `/health` restarts the pod every two minutes before the
           # bootstrap can run.
+          # Five seconds, not the default one: `/health` waits on SQLite over NFS
+          # and misses a one-second deadline while a backup is being written.
           readinessProbe:
             httpGet:
               path: /health
               port: 3903
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             tcpSocket:
               port: 3903
