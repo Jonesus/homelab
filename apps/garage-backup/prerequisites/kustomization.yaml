@@ -6,5 +6,7 @@ resources:
   # gitignored. This directory does not build until it exists, which is why
   # neither Application is in `apps/kustomization.yaml` until it does.
   - secrets.sealed.yaml
+  # The photo mirror's two S3 keys, from `assets-mirror.unsealed.yaml`.
+  - assets-mirror.sealed.yaml
 
 namespace: garage-backup

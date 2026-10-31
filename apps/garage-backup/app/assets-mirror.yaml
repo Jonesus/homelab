@@ -1,0 +1,131 @@
+# A nightly copy of Pilke's photos, the main Garage's `assets` bucket on the
+# TrueNAS, into `pilke-assets` here on the QNAP. The database backups are in this
+# store for the same reason: a copy on the NAS that already holds the original is
+# not a backup of it.
+#
+# `sync` with `--backup-dir`, so the copy follows the source and nothing is lost
+# on the way: a photo deleted or replaced in `assets` moves to
+# `deleted/<date>/` instead of vanishing, and a `deleted/<date>/` older than
+# RETENTION_DAYS is purged. That is the same 30 days as the database's
+# `retentionPolicy`, and for the same reason: it is how long a deleted account's
+# photo survives in a backup, and the privacy statement has to say so.
+#
+# The age is read from the directory's name, not from the objects. A server-side
+# move keeps an object's original modification time, so `--min-age` would purge
+# a two-month-old photo the night it was deleted.
+#
+# The source key is read-only (`garage bucket allow --read`), so nothing this job
+# does can change the original. Keys are in `assets-mirror`, sealed by
+# `../create-secrets.bash`; bootstrap is in `../README.md`.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: assets-mirror
+  namespace: garage-backup
+spec:
+  # 01:45 UTC, half an hour after the database's base backup starts, so the two
+  # are not writing to the QNAP at once.
+  schedule: "45 1 * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels:
+            app: assets-mirror
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rclone
+              image: rclone/rclone:1.75.2
+              command: [/bin/sh, -c]
+              args:
+                - |
+                  set -eu
+                  today=$(date -u +%F)
+                  rclone sync src:assets dst:pilke-assets/current \
+                    --backup-dir "dst:pilke-assets/deleted/$today" \
+                    --checksum --stats-one-line --stats 0 -v
+                  cutoff=$(date -u -d "@$(( $(date +%s) - RETENTION_DAYS * 86400 ))" +%F)
+                  rclone lsf --dirs-only dst:pilke-assets/deleted/ 2>/dev/null \
+                    | tr -d / \
+                    | awk -v c="$cutoff" '$0 < c' \
+                    | while read -r d; do
+                        echo "purging deleted/$d (older than $cutoff)"
+                        rclone purge "dst:pilke-assets/deleted/$d"
+                      done
+                  rclone size dst:pilke-assets/current
+              env:
+                - name: RETENTION_DAYS
+                  value: "30"
+                - name: HOME
+                  value: /tmp
+                - name: RCLONE_CONFIG
+                  value: /tmp/rclone.conf
+                # The main Garage, plain HTTP inside the cluster as for the API.
+                - name: RCLONE_CONFIG_SRC_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_SRC_PROVIDER
+                  value: Other
+                - name: RCLONE_CONFIG_SRC_ENDPOINT
+                  value: http://garage.garage.svc.cluster.local:3900
+                - name: RCLONE_CONFIG_SRC_REGION
+                  value: garage
+                - name: RCLONE_CONFIG_SRC_FORCE_PATH_STYLE
+                  value: "true"
+                # This store, through the same TLS listener and CA the database
+                # backups use.
+                - name: RCLONE_CONFIG_DST_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_DST_PROVIDER
+                  value: Other
+                - name: RCLONE_CONFIG_DST_ENDPOINT
+                  value: https://garage-backup.garage-backup.svc.cluster.local:3443
+                - name: RCLONE_CONFIG_DST_REGION
+                  value: garage
+                - name: RCLONE_CONFIG_DST_FORCE_PATH_STYLE
+                  value: "true"
+                - name: RCLONE_CA_CERT
+                  value: /tls/ca.crt
+              envFrom:
+                - secretRef:
+                    name: assets-mirror
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+                - name: ca
+                  mountPath: /tls
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  memory: 256Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+          volumes:
+            - name: tmp
+              emptyDir: {}
+            # Only the CA out of the listener's certificate Secret, not its key.
+            - name: ca
+              secret:
+                secretName: garage-backup-tls
+                items:
+                  - key: ca.crt
+                    path: ca.crt

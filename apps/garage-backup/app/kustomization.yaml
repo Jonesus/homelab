@@ -9,5 +9,6 @@ resources:
   - statefulset.yaml
   - service.yaml
   - network-policy.yaml
+  - assets-mirror.yaml
 
 namespace: garage-backup

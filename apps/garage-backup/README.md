@@ -111,6 +111,39 @@ $G bucket allow --read --write pilke-postgres --key pilke-postgres
 `apps/pilke/README.md` takes over. If the secret scrolled away:
 `$G key info pilke-postgres --show-secret`.
 
+## The photo mirror
+
+`app/assets-mirror.yaml` copies Pilke's photos, the main Garage's `assets`
+bucket, into `pilke-assets` here every night at 01:45 UTC. Deleted and replaced
+photos are kept under `deleted/<date>/` for 30 days, then purged. Its two keys
+were made once:
+
+```bash
+SRC="kubectl -n garage exec garage-0 -c garage -- /garage"
+$SRC key create pilke-assets-backup
+$SRC bucket allow --read assets --key pilke-assets-backup     # read-only, on purpose
+
+$G bucket create pilke-assets
+$G key create pilke-assets
+$G bucket allow --read --write pilke-assets --key pilke-assets
+```
+
+Both go into `prerequisites/assets-mirror.unsealed.yaml` (gitignored) as
+`RCLONE_CONFIG_SRC_ACCESS_KEY_ID`, `RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY`,
+`RCLONE_CONFIG_DST_ACCESS_KEY_ID` and `RCLONE_CONFIG_DST_SECRET_ACCESS_KEY`,
+sealed by `./create-secrets.bash`. To run it now rather than tonight:
+
+```bash
+kubectl -n garage-backup create job --from=cronjob/assets-mirror assets-mirror-now
+kubectl -n garage-backup logs -f job/assets-mirror-now
+```
+
+⚠️ **Admin commands stall uploads here.** `bucket create` and `key create` write
+Garage's SQLite metadata over NFS, and while they ran, a WAL upload from Pilke
+hung for about three minutes and was retried. Archiving caught up by itself, but
+run admin commands when nothing urgent is being written, and check
+`pg_stat_archiver` afterwards.
+
 ## What this is not
 
 - **Not offsite.** Both boxes are in the same building, so a fire, a theft or a
