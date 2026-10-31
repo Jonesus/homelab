@@ -17,5 +17,6 @@ resources:
   - node-feature-discovery/resources.yaml
   - intel-device-plugin/app.yaml
   - cloudnative-pg/app.yaml
+  - cnpg-barman-cloud/app.yaml
   - adguard/app.yaml
   - snapshot-controller/app.yaml
