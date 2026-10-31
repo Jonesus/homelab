@@ -209,3 +209,4 @@ The same manifests restore production, with three differences.
 
 | Date (UTC) | Who | Target | Base backup | Restore took | Diff | Notes |
 |---|---|---|---|---|---|---|
+| 2026-10-31 17:45 | Claude Code, for Joonas | `drill-20261031T174454Z` (PITR) | `20261031T174211` | 95 s | empty, 61 counts | First drill, right after backups went live. `treffit` role and PostGIS checked. |
