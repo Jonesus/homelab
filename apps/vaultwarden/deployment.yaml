@@ -7,6 +7,10 @@ metadata:
     app: vaultwarden
 spec:
   replicas: 1
+  # Recreate, not a rolling update: the data volume attaches to one node
+  # at a time, so a new pod cannot start until the old one has let go.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: vaultwarden
