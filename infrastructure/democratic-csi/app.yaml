@@ -22,9 +22,15 @@ spec:
         controller:
           driver:
             enabled: true
+            # ⚠️ PINNED BY DIGEST, NOT `next`. A newer `next` refuses to send the
+            # TrueNAS API key over `ws://` ("unable to use apiKey over clear
+            # text"), and a controller that lands on a node without this build
+            # cached pulls it: every iSCSI volume then stops attaching. The way
+            # off the pin is the driver config speaking https/wss to the
+            # TrueNAS, then a released tag.
             image:
               registry: docker.io/democraticcsi/democratic-csi
-              tag: next
+              tag: next@sha256:5b607d63a270330b4cdaa70ae961fc1484f0dda3d164d940e69e1faa213682fd
         node:
           hostPID: true
           driver:
