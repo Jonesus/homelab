@@ -34,6 +34,12 @@ spec:
         node:
           hostPID: true
           driver:
+            # Pinned for the controller's reason above: the node plugin restarts
+            # with every node reboot, and `latest` with the chart's `Always`
+            # would pull whatever was published that day.
+            image:
+              registry: docker.io/democraticcsi/democratic-csi
+              tag: latest@sha256:944d0e65077efbd9c1fdf23997eec8fac4b4bfb7c3de400f63e33a0a849c5ced
             extraEnv:
               - name: ISCSIADM_HOST_STRATEGY
                 value: nsenter
