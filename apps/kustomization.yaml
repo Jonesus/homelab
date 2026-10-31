@@ -26,13 +26,10 @@ resources:
   - taulu/prerequisites.yaml
   - garage/app.yaml
   - garage/prerequisites.yaml
-  # ⚠️ NOT LISTED YET, ON PURPOSE: the backup store on the QNAP. Its
-  # prerequisites do not build until `garage-backup/prerequisites/secrets.sealed.yaml`
-  # exists, and its pod cannot mount anything until the NFS directory exists on
-  # the NAS. Both steps, and then these two lines, are in `garage-backup/README.md`.
-  #
-  # - garage-backup/app.yaml
-  # - garage-backup/prerequisites.yaml
+  # The backup store on the QNAP. It needs `/cluster/pilke-backup` on the NAS and
+  # its sealed secret; both are in `garage-backup/README.md`.
+  - garage-backup/app.yaml
+  - garage-backup/prerequisites.yaml
   - pilke/app.yaml
   - pilke/prerequisites.yaml
   - pilke/observability.yaml
