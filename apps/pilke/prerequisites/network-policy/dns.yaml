@@ -1,0 +1,31 @@
+# STAGE 2. Name resolution, for every pod. Without it the default deny breaks
+# everything at once and the symptom is every process failing to resolve the
+# first hostname it needs, which reads as a DNS outage rather than as a policy.
+#
+# To CoreDNS's pods rather than to the `kube-dns` Service address: a policy sees
+# the packet after the Service has been translated to a pod. `k8s-app: kube-dns`
+# is the label Talos's CoreDNS carries:
+#
+#     kubectl -n kube-system get pods -l k8s-app=kube-dns
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dns-egress
+  namespace: pilke
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

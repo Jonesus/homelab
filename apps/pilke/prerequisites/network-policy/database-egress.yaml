@@ -1,0 +1,70 @@
+# STAGE 2. What the Postgres pods dial out to: the Kubernetes API, the backup
+# store, and each other.
+#
+# ⚠️ THE API SERVER IS THE ONE THAT MATTERS. The instance manager in every CNPG
+# pod watches its Cluster and writes its status through the API, and so does
+# the Barman Cloud sidecar beside it. Cut that and Postgres keeps running while
+# the operator loses sight of it: no failover, no status, and backups that stop
+# being scheduled.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pilke-postgres-egress
+  namespace: pilke
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: pilke-postgres
+  policyTypes:
+    - Egress
+  egress:
+    # The API server, as the policy sees it: after `kubernetes.default`'s
+    # address has been translated to a control-plane node, which on Talos is
+    # the node's own LAN address on 6443. Every node is in 192.168.1.0/24.
+    # The Service address on 443 is listed as well because some
+    # implementations evaluate before that translation. Talos's default
+    # service CIDR puts `kubernetes.default` at 10.96.0.1. Check both:
+    #
+    #     kubectl get endpointslices -n default -l kubernetes.io/service-name=kubernetes
+    #     kubectl get svc -n default kubernetes
+    #
+    # ⚠️ Under Cilium an ipBlock does not match cluster nodes at all, and this
+    # rule needs `toEntities: [kube-apiserver]` in a CiliumNetworkPolicy
+    # instead.
+    - to:
+        - ipBlock:
+            cidr: 192.168.1.0/24
+      ports:
+        - protocol: TCP
+          port: 6443
+    - to:
+        - ipBlock:
+            cidr: 10.96.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # WAL archiving, base backups and restores, through the TLS listener of the
+    # Garage on the QNAP. The other end admits exactly this traffic, in
+    # `apps/garage-backup/app/network-policy.yaml`.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: garage-backup
+          podSelector:
+            matchLabels:
+              app: garage-backup
+      ports:
+        - protocol: TCP
+          port: 3443
+
+    # The other end of the instance-to-instance rule in `database.yaml`.
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: pilke-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 8000

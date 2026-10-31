@@ -1,0 +1,240 @@
+# STAGE 2. The telemetry stack: the collector, Grafana, the two vmalerts and
+# Alertmanager. The stores' ingress is stage 1, in `stores.yaml`; under the
+# default deny they need no egress beyond DNS.
+#
+# ---------------------------------------------------------------------------
+# The collector gateway. In: OTLP from the application and from the log agent in
+# `pilke-logs`, and the authenticated public receiver from ingress-nginx.
+#
+# ⚠️ THE LOG AGENT IS IN ANOTHER NAMESPACE, and this is the rule that would
+# silently cut it. `../../observability/collector-gateway.yaml` warns about
+# exactly this: node logs stop while traces keep arriving.
+# ---------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: otel-collector
+  namespace: pilke
+spec:
+  podSelector:
+    matchLabels:
+      app: otel-collector
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - pilke-api
+                  - pilke-worker
+                  - pilke-scheduler
+                  - pilke-migrate
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: pilke-logs
+          podSelector:
+            matchLabels:
+              app: otel-collector-agent
+      ports:
+        - protocol: TCP
+          port: 4318
+    # 4319 and only 4319: the receiver that demands the bearer key, which is
+    # the one `../../observability/ingress-otlp.yaml` routes to.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 4319
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: victoria-logs-single
+              app.kubernetes.io/instance: pilke
+      ports:
+        - protocol: TCP
+          port: 9428
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vt-single
+              app.kubernetes.io/instance: pilke
+      ports:
+        - protocol: TCP
+          port: 10428
+---
+# ---------------------------------------------------------------------------
+# Grafana. In: ingress-nginx, for `pilke-o11y.internal`. Out: the two stores, the
+# Kubernetes API for the dashboard sidecar, and grafana.com.
+# ---------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: grafana
+  namespace: pilke
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+      app.kubernetes.io/instance: pilke
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # The pod's port, not the Service's 80.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: victoria-logs-single
+              app.kubernetes.io/instance: pilke
+      ports:
+        - protocol: TCP
+          port: 9428
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vt-single
+              app.kubernetes.io/instance: pilke
+      ports:
+        - protocol: TCP
+          port: 10428
+    # The dashboard sidecar watches ConfigMaps through the API. The address
+    # reasoning, and the Cilium caveat, are in `database-egress.yaml`.
+    - to:
+        - ipBlock:
+            cidr: 192.168.1.0/24
+      ports:
+        - protocol: TCP
+          port: 6443
+    - to:
+        - ipBlock:
+            cidr: 10.96.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+    # ⚠️ The logs datasource plugin is downloaded from grafana.com at every pod
+    # start (`plugins:` in the chart values), so without this Grafana does not
+    # become ready after its next restart. Same shape as the application's
+    # third-party rule in `app.yaml`.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 100.64.0.0/10
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# ---------------------------------------------------------------------------
+# Both vmalerts. Out: the store each reads and Alertmanager. Nothing reaches
+# them; their own UI is not routed anywhere.
+#
+# One policy for both, so each may technically reach the other's store. They
+# are configured with one datasource each, and two policies would buy nothing
+# but a second place to keep in step.
+# ---------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vmalert
+  namespace: pilke
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics-alert
+      app: server
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: victoria-logs-single
+              app.kubernetes.io/instance: pilke
+      ports:
+        - protocol: TCP
+          port: 9428
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vt-single
+              app.kubernetes.io/instance: pilke
+      ports:
+        - protocol: TCP
+          port: 10428
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: victoria-metrics-alert
+              app: alertmanager
+      ports:
+        - protocol: TCP
+          port: 9093
+---
+# ---------------------------------------------------------------------------
+# Alertmanager. In: the two vmalerts. Out: Home Assistant's webhook, which turns
+# an alert into a push on the owner's phone.
+#
+# ⚠️ IF THIS IS WRONG, ALERTS STOP AND NOTHING SAYS SO. Every other mistake in
+# this directory shows up as a broken pod or a missing graph; this one shows up
+# as a quiet phone. The rollout's check fires a test alert for that reason.
+# ---------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: alertmanager
+  namespace: pilke
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics-alert
+      app: alertmanager
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: victoria-metrics-alert
+              app: server
+      ports:
+        - protocol: TCP
+          port: 9093
+  egress:
+    # The Service is `home-assistant:8080`; the pod listens on 8123, and the
+    # pod's port is what a policy sees.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: homeassistant
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: home-assistant
+      ports:
+        - protocol: TCP
+          port: 8123

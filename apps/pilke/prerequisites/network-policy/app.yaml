@@ -1,0 +1,165 @@
+# STAGE 2. The API, the worker, the scheduler and the migration Job: who may
+# reach them, and what they may reach. Plus the one pod that comes and goes
+# with the API's certificate, at the bottom.
+#
+# ---------------------------------------------------------------------------
+# In: only the API takes connections, and only from ingress-nginx. Both
+# Ingresses (`api.pilke.app` and `pilke.internal`) are the same controller.
+# ---------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pilke-api-ingress
+  namespace: pilke
+spec:
+  podSelector:
+    matchLabels:
+      app: pilke-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+---
+# ---------------------------------------------------------------------------
+# Out, for all four: the database and the collector.
+# ---------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pilke-app-egress
+  namespace: pilke
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - pilke-api
+          - pilke-worker
+          - pilke-scheduler
+          - pilke-migrate
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: pilke-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    # `OTEL_EXPORTER_OTLP_ENDPOINT`, the unauthenticated in-cluster receiver.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: otel-collector
+      ports:
+        - protocol: TCP
+          port: 4318
+---
+# ---------------------------------------------------------------------------
+# Out, for the API and the worker only: the photographs, and the internet.
+#
+# The scheduler is left out on purpose: it enqueues and does no work itself
+# (`../../app/deployment-scheduler.yaml`), so it has no reason to reach
+# anything but the database. The migration Job is left out for the same reason.
+# Either one gaining a third-party call is a change to this file.
+# ---------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pilke-app-external-egress
+  namespace: pilke
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - pilke-api
+          - pilke-worker
+  policyTypes:
+    - Egress
+  egress:
+    # Garage's S3 API, which is where `MEDIA_STORAGE_OPTIONS` uploads go. The
+    # headless Service resolves straight to the pod. The worker is here for
+    # the account deletion that will unlink photographs from a task.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: garage
+          podSelector:
+            matchLabels:
+              app: garage
+      ports:
+        - protocol: TCP
+          port: 3900
+
+    # ⚠️ THE THIRD PARTIES, AS AN ADDRESS RANGE, BECAUSE A NETWORKPOLICY HAS NO
+    # HOSTNAMES. What the backend calls, read from treffit-backend:
+    #
+    #   gateway.seven.io     SMS (`SevenSmsBackend`, the one selected)
+    #   gatewayapi.eu        SMS (`GatewayApiSmsBackend`, the fallback)
+    #   api.poststack.dev    mail and the safety alert (`PostStack*Backend`)
+    #   exp.host             push and push receipts (`ExpoPushBackend`)
+    #
+    # All HTTPS, all on 443, and all behind CDNs whose addresses move, so the
+    # rule is "port 443 anywhere on the internet" rather than four addresses
+    # that would be wrong by next month. What it does close is everything
+    # private: the LAN, the NAS boxes, the router, and every pod and Service
+    # in the cluster that is not named above. Narrowing it to the four names
+    # needs an FQDN-aware policy, which is Cilium's `toFQDNs` and not this API.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 100.64.0.0/10
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# ---------------------------------------------------------------------------
+# cert-manager's HTTP-01 solver, which renews `pilke-tls` for `api.pilke.app`.
+#
+# ⚠️ EASY TO MISS BECAUSE IT IS NOT ALWAYS THERE. cert-manager creates the
+# solver pod in this namespace, beside the Ingress it is solving for, for the
+# few minutes a renewal takes every sixty days or so, and Let's Encrypt reaches
+# it through ingress-nginx. Under the default deny without this rule the
+# renewal fails, the old certificate keeps working, and the first symptom is the
+# API's certificate expiring a month later.
+# ---------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: acme-http01-solver
+  namespace: pilke
+spec:
+  podSelector:
+    matchLabels:
+      acme.cert-manager.io/http01-solver: "true"
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8089

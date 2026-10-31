@@ -158,9 +158,10 @@ spec:
 # `../log-agent/collector-agent-config.yaml` — a file no diff of this directory
 # will show you. Renaming this Service, or moving it, breaks a caller that is
 # not visible from here, and the symptom is node logs quietly stopping while
-# traces keep arriving. Nothing gates that traffic today: there is no
-# NetworkPolicy in this namespace, and a default-deny added here would cut the
-# same path with the same silent symptom.
+# traces keep arriving. The NetworkPolicy that admits it is `otel-collector` in
+# `../prerequisites/network-policy/observability.yaml`, and the namespace's
+# default deny without that rule cuts the same path with the same silent
+# symptom.
 #
 # OTLP/HTTP only. No gRPC port, because nothing here speaks gRPC — the Python
 # exporter is the proto-http one and the JS exporter has no choice — and an open
