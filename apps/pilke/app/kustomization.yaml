@@ -15,6 +15,7 @@ resources:
   # is ever removed, remove the other.
   - ingress.yaml
   - assets-route-public.yaml
+  - db-dump.yaml
 
 namespace: pilke
 

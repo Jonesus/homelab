@@ -238,10 +238,11 @@ seconds old instead of hours old.
 
 ## Backups
 
-⚠️ **Not on until the steps below have been done.** Until `- backup` is
-uncommented in `prerequisites/kustomization.yaml` there are none, and that must
-not still be true when a real person registers: a beta that loses its users'
-data does not get a second beta.
+Three copies, all in the QNAP store, all kept 30 days: WAL archiving with
+nightly base backups, an hourly logical dump, and a nightly mirror of the
+photos (`apps/garage-backup/README.md`, "The photo mirror"). The steps at the
+end of this section are how the first one is switched on, and how it would be
+again on a new cluster.
 
 WAL archiving and a nightly base backup, through CloudNativePG's Barman Cloud
 plugin (`infrastructure/cnpg-barman-cloud`), into a Garage on the **QNAP**
@@ -297,6 +298,32 @@ Turning it on, once, in this order:
    `prerequisites/kustomization.yaml`. After the sync, `kubectl -n pilke get
    backups` shows the `immediate` backup running, then completed.
 5. **The drill**, the same day: [`restore-drill/README.md`](restore-drill/README.md).
+
+### The hourly logical dump
+
+`app/db-dump.yaml`: `pg_dump -Fc` of `treffit` at :17 every hour into the QNAP
+store's `pilke-dumps` bucket, through the same TLS listener and CA as the WAL
+archive, kept 30 days. It is the copy for what the WAL archive cannot do:
+restore after a failed CloudNativePG or Postgres major upgrade, restore into a
+plain Postgres anywhere, or give back one table without restoring a cluster.
+Its key is `pilke-db-dump-s3`, sealed by `create-secrets.bash` from
+`prerequisites/db-dump-s3.unsealed.yaml` (`RCLONE_CONFIG_DST_ACCESS_KEY_ID`,
+`RCLONE_CONFIG_DST_SECRET_ACCESS_KEY`, from `garage key create pilke-dumps`).
+
+```bash
+kubectl -n pilke get cronjob pilke-db-dump                   # LAST SCHEDULE within the hour
+kubectl -n pilke create job --from=cronjob/pilke-db-dump dump-now
+kubectl -n pilke logs job/dump-now -c dump                   # size and table count
+kubectl -n pilke logs job/dump-now -c upload                 # how many dumps the bucket holds
+```
+
+To restore one, copy it out of `pilke-dumps` (rclone, as the CronJob's `upload`
+container is configured) and into any Postgres 17 with PostGIS:
+
+```bash
+createdb treffit && psql -d treffit -c 'CREATE EXTENSION postgis'
+pg_restore --no-owner --role=treffit -d treffit treffit-<stamp>.dump
+```
 
 ## Network policies
 

@@ -35,6 +35,8 @@ spec:
                   - pilke-worker
                   - pilke-scheduler
                   - pilke-migrate
+                  # The hourly logical dump, `../../app/db-dump.yaml`.
+                  - pilke-db-dump
       ports:
         - protocol: TCP
           port: 5432

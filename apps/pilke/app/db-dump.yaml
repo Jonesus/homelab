@@ -1,0 +1,144 @@
+# An hourly logical dump of `treffit`, kept 30 days in the QNAP store's
+# `pilke-dumps` bucket.
+#
+# The WAL archive and base backups (`../prerequisites/backup/`) are the fast,
+# precise restore, but only CloudNativePG can read them, and only into the same
+# Postgres major version. A `pg_dump -Fc` is the copy that survives what they do
+# not: a failed operator or Postgres upgrade, a broken barman-cloud, or needing
+# one table back without restoring a cluster. `pg_restore` reads it anywhere.
+#
+# Two containers so the upload only runs if the dump succeeded: the dump is an
+# initContainer into an emptyDir, and it refuses an archive with no table data
+# in it rather than uploading an empty file that looks like a backup.
+#
+# 30 days for the reason the ObjectStore's `retentionPolicy` gives: it is how
+# long a deleted account survives in a backup, and the privacy statement has to
+# say so. Each dump is a new object, so its age is its upload time.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pilke-db-dump
+spec:
+  # :17 past, clear of the nightly base backup (01:15) and the photo mirror
+  # (01:45) at the top of their hours.
+  schedule: "17 * * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            # Named in the stage 1 policy on Postgres, the backup store's
+            # ingress, and stage 2's `pilke-db-dump-egress`.
+            app: pilke-db-dump
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 26
+            runAsGroup: 26
+            fsGroup: 26
+            seccompProfile:
+              type: RuntimeDefault
+          initContainers:
+            - name: dump
+              # The cluster's own image, so pg_dump is the server's exact version.
+              image: ghcr.io/cloudnative-pg/postgis:17-3.5-9
+              command: [/bin/bash, -c]
+              args:
+                - |
+                  set -euo pipefail
+                  out="/dump/treffit-$(date -u +%Y%m%dT%H%M%SZ).dump"
+                  pg_dump --format=custom --compress=6 --no-password --file="$out" treffit
+                  tables=$(pg_restore --list "$out" | grep -c "TABLE DATA" || true)
+                  [ "$tables" -gt 0 ] || { echo "dump has no table data, refusing it"; exit 1; }
+                  echo "dumped $(du -h "$out" | cut -f1), $tables tables of data: $(basename "$out")"
+              env:
+                - name: PGHOST
+                  value: pilke-postgres-rw.pilke.svc
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef: {name: pilke-postgres-user, key: username}
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef: {name: pilke-postgres-user, key: password}
+                - name: PGSSLMODE
+                  value: verify-full
+                - name: PGSSLROOTCERT
+                  value: /tls/postgres/ca.crt
+              volumeMounts:
+                - {name: dump, mountPath: /dump}
+                - {name: postgres-ca, mountPath: /tls/postgres, readOnly: true}
+              resources:
+                requests: {cpu: 50m, memory: 128Mi}
+                limits: {memory: 512Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: {drop: [ALL]}
+          containers:
+            - name: upload
+              image: rclone/rclone:1.75.2
+              command: [/bin/sh, -c]
+              args:
+                - |
+                  set -eu
+                  rclone copy /dump dst:pilke-dumps --stats-one-line --stats 0 -v
+                  rclone delete dst:pilke-dumps --min-age "${RETENTION_DAYS}d" -v
+                  echo "$(rclone lsf dst:pilke-dumps | wc -l) dumps in pilke-dumps"
+              env:
+                - name: RETENTION_DAYS
+                  value: "30"
+                - name: HOME
+                  value: /tmp
+                - name: RCLONE_CONFIG
+                  value: /tmp/rclone.conf
+                - name: RCLONE_CONFIG_DST_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_DST_PROVIDER
+                  value: Other
+                - name: RCLONE_CONFIG_DST_ENDPOINT
+                  value: https://garage-backup.garage-backup.svc.cluster.local:3443
+                - name: RCLONE_CONFIG_DST_REGION
+                  value: garage
+                - name: RCLONE_CONFIG_DST_FORCE_PATH_STYLE
+                  value: "true"
+                # The CA the WAL archive verifies the same listener with.
+                - name: RCLONE_CA_CERT
+                  value: /tls/backup/ca.crt
+              envFrom:
+                - secretRef:
+                    name: pilke-db-dump-s3
+              volumeMounts:
+                - {name: dump, mountPath: /dump, readOnly: true}
+                - {name: tmp, mountPath: /tmp}
+                - {name: backup-ca, mountPath: /tls/backup, readOnly: true}
+              resources:
+                requests: {cpu: 50m, memory: 64Mi}
+                limits: {memory: 256Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: {drop: [ALL]}
+          volumes:
+            - name: dump
+              emptyDir:
+                sizeLimit: 2Gi
+            - name: tmp
+              emptyDir: {}
+            # Only the certificates, never `ca.key`, which the Postgres CA
+            # Secret also holds.
+            - name: postgres-ca
+              secret:
+                secretName: pilke-postgres-ca
+                items: [{key: ca.crt, path: ca.crt}]
+            - name: backup-ca
+              secret:
+                secretName: pilke-backup-endpoint-ca
+                items: [{key: ca.crt, path: ca.crt}]

@@ -163,3 +163,35 @@ spec:
       ports:
         - protocol: TCP
           port: 8089
+---
+# The hourly logical dump (`../../app/db-dump.yaml`): Postgres to read from,
+# the QNAP store's TLS listener to write to, nothing else. DNS is `dns.yaml`'s.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pilke-db-dump-egress
+  namespace: pilke
+spec:
+  podSelector:
+    matchLabels:
+      app: pilke-db-dump
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: pilke-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: garage-backup
+          podSelector:
+            matchLabels:
+              app: garage-backup
+      ports:
+        - protocol: TCP
+          port: 3443
