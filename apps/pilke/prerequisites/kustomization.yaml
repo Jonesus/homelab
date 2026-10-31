@@ -7,5 +7,9 @@ resources:
   - database-user.sealed.yaml
   - app-secrets.sealed.yaml
   - ghcr-pull.sealed.yaml
+  # Here, in wave -1 with the database, so the policy that guards Postgres exists
+  # from the same sync that creates it. What is live and what is staged is in
+  # that directory's own kustomization.
+  - network-policy
 
 namespace: pilke

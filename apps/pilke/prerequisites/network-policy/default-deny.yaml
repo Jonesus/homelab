@@ -1,0 +1,22 @@
+# STAGE 2. Nothing in, nothing out, for every pod in `pilke`, except what another
+# policy in this directory names.
+#
+# ⚠️ THIS IS THE ONE THAT CAN TAKE PILKE DOWN. Every other file only narrows the
+# pods it selects; this one closes every pod in the namespace, including any
+# added later by a chart or a manifest that nobody wrote a policy for. A new
+# workload in `pilke` needs its own allow rules in this directory in the same
+# commit, or it comes up unable to resolve a name.
+#
+# The kubelet's liveness and readiness probes are not affected: the
+# implementations this cluster can run (kube-network-policies under Flannel,
+# Cilium, Calico) all exempt traffic from the node to its own pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: pilke
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

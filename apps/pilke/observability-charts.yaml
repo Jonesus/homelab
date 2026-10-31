@@ -12,7 +12,10 @@
 # stores accept any request that reaches them; `vmauth` is what would add a
 # credential and it is not deployed. That is safe only for as long as the only
 # routes in are a LAN-only Ingress on `internal-ca` and the collector. Do not
-# give any of these an `Ingress` on `letsencrypt-prod`.
+# give any of these an `Ingress` on `letsencrypt-prod`. Inside the cluster,
+# `prerequisites/network-policy/stores.yaml` is what makes "the only routes in"
+# true, and only once the CNI enforces NetworkPolicy; its selectors are this
+# file's chart labels, so re-check them after a chart bump.
 #
 # ⚠️ `useLegacyNaming: false` in the three VictoriaMetrics charts is load-bearing
 # rather than cosmetic. Left unset, those charts name a Service after the release

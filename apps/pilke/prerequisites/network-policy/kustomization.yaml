@@ -1,0 +1,67 @@
+# NetworkPolicies for `pilke`, in two stages. Audit finding I-05: there were none
+# anywhere in the cluster, and two of Pilke's stores take requests with no
+# authentication at all.
+#
+# ⚠️ FIRST, WHETHER ANY OF THIS DOES ANYTHING. A NetworkPolicy is an instruction
+# to the CNI, and a CNI that does not implement them accepts the objects and
+# ignores them: `kubectl get networkpolicy` lists them and every packet still
+# flows. Nothing in this repository installs a CNI, so the cluster runs whatever
+# Talos deployed at bootstrap, and Talos's default is Flannel, which enforces
+# nothing on its own. The Talos machine config is gitignored (`talos/`), so
+# which one is running cannot be read from here. Check:
+#
+#     kubectl -n kube-system get ds                  # kube-flannel? cilium? calico-node?
+#     kubectl -n kube-system get ds kube-flannel -o jsonpath='{.spec.template.spec.containers[*].name}'
+#
+# `kube-flannel` alone: not enforced. `kube-flannel kube-network-policies`, or a
+# Cilium or Calico DaemonSet: enforced.
+#
+# If it is Flannel alone, the smallest path is the one Talos ships from v1.13:
+# Flannel plus kube-network-policies (SIG Network's own implementation), turned on
+# by a machine config patch on the control plane and no CNI migration —
+#
+#     cluster:
+#       network:
+#         cni:
+#           name: flannel
+#           flannel:
+#             kubeNetworkPoliciesEnabled: true
+#
+# then `talosctl upgrade-k8s --to <the version already running>`, which is how
+# Talos re-syncs the bootstrap manifests it owns. Below v1.13, upgrade Talos
+# first. Cilium is the larger alternative: a CNI replacement with pod network
+# downtime, in exchange for hostname-based egress (`toFQDNs`), which is what
+# would let `app.yaml`'s third-party rule name four hosts instead of an address
+# range.
+#
+# ⚠️ ENFORCEMENT ARRIVING IS THE MOMENT STAGE 1 TAKES EFFECT. If enforcement is
+# turned on after this is merged, the files below start biting then, not at the
+# merge, and the rollout's checks belong to that moment.
+#
+# ---------------------------------------------------------------------------
+# STAGE 1, live: a policy on the database and on the two stores, ingress only.
+# This is the part the audit marked as blocking the demo, and it is the part
+# that cannot break anything those pods dial out to.
+# ---------------------------------------------------------------------------
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - database.yaml
+  - stores.yaml
+  # -------------------------------------------------------------------------
+  # ⚠️ STAGE 2 IS NOT LISTED YET, ON PURPOSE. It is the namespace-wide default
+  # deny for both directions plus every allow rule that makes it survivable,
+  # and the five files go in together, in one commit, after stage 1 has been
+  # checked against the live cluster. One of them alone is an outage: the
+  # default deny without `dns.yaml` stops every name lookup in the namespace.
+  # The order of checks is in `../../README.md`.
+  #
+  # - default-deny.yaml
+  # - dns.yaml
+  # - database-egress.yaml
+  # - app.yaml
+  # - observability.yaml
+  # -------------------------------------------------------------------------
+
+namespace: pilke

@@ -1,0 +1,81 @@
+# STAGE 1. The two stores that take any request that reaches them.
+#
+# VictoriaLogs and VictoriaTraces have no authentication at all
+# (`../../observability-charts.yaml` says so in capitals), so until now the only
+# thing between thirty days of Pilke's logs and traces — their delete APIs
+# included — and any pod in the cluster was nobody having tried. These say who
+# the clients are: the collector writes, Grafana and the two vmalerts read.
+#
+# Ingress only, for the reason `database.yaml` gives. Nothing about what these
+# stores dial out to changes until stage 2, and they dial out to nothing.
+#
+# ⚠️ THE SELECTORS ARE CHART LABELS, not labels this repository writes. They
+# were read off `helm template` of the pinned chart versions, and a chart bump
+# that renames them turns a policy into one that selects nothing — the store
+# goes back to open, silently. Re-check these after bumping any of the four
+# charts:
+#
+#     kubectl -n pilke get pods -l app.kubernetes.io/name=victoria-logs-single
+#     kubectl -n pilke get pods -l app.kubernetes.io/name=vt-single
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: victoria-logs-ingress
+  namespace: pilke
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-logs-single
+      app.kubernetes.io/instance: pilke
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: otel-collector
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+              app.kubernetes.io/instance: pilke
+        # The logs vmalert. Its rules read this store; the traces one never
+        # does, which is why the instance label is pinned rather than the
+        # chart's name alone.
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: victoria-metrics-alert
+              app.kubernetes.io/instance: pilke-logs
+              app: server
+      ports:
+        - protocol: TCP
+          port: 9428
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: victoria-traces-ingress
+  namespace: pilke
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vt-single
+      app.kubernetes.io/instance: pilke
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: otel-collector
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+              app.kubernetes.io/instance: pilke
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: victoria-metrics-alert
+              app.kubernetes.io/instance: pilke-traces
+              app: server
+      ports:
+        - protocol: TCP
+          port: 10428
