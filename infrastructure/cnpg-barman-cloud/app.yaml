@@ -1,0 +1,48 @@
+# The Barman Cloud plugin for CloudNativePG: what ships a cluster's WAL and base
+# backups to an object store, and what restores them.
+#
+# The plugin rather than the in-tree `spec.backup.barmanObjectStore`. The in-tree
+# support is deprecated from CNPG 1.26 and is being removed upstream, so a
+# backup configuration written against it today is one to migrate under
+# pressure later. Nothing here uses it yet, which makes this the cheap moment.
+#
+# ⚠️ IT MUST LIVE IN THE OPERATOR'S NAMESPACE. CNPG discovers plugins by looking
+# for their Service in its own namespace, `cnpg-system`, and a plugin installed
+# anywhere else is never found: a Cluster that names it reports the plugin as
+# missing and nothing more.
+#
+# ⚠️ PINNED, AND THE PIN IS A COMPATIBILITY CLAIM. Chart 0.8.1 is plugin v0.15.1,
+# which needs CNPG 1.26 or newer; `../cloudnative-pg/app.yaml` pins chart
+# v0.27.0, which is operator 1.28.0. Upstream's documentation for the next
+# plugin release already says 1.30, so bump the operator first and this second,
+# never the other way round.
+#
+# cert-manager is a hard dependency rather than a nicety: the chart issues the
+# certificates the operator and the plugin use to authenticate each other over
+# gRPC, with an Issuer of its own, so nothing here touches `internal-ca`.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cnpg-barman-cloud
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: cnpg-system
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: plugin-barman-cloud
+    repoURL: https://cloudnative-pg.github.io/charts
+    targetRevision: 0.8.1
+    helm:
+      releaseName: plugin-barman-cloud
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      # The ObjectStore CRD is large enough that client-side apply's
+      # last-applied annotation is a risk, for the same reason the operator's
+      # own Application applies server-side.
+      - ServerSideApply=true
