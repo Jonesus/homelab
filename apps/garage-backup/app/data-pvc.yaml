@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: garage-backup-data
+  namespace: garage-backup
+spec:
+  storageClassName: ""
+  volumeName: garage-backup-data
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi

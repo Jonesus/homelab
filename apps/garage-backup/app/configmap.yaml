@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: garage-backup
+  namespace: garage-backup
+data:
+  garage.toml: |
+    # ⚠️ SQLITE, NOT THE LMDB `../../garage` RUNS, AND THE STORAGE IS WHY. Both
+    # directories are on an NFS export from the QNAP. LMDB works through a
+    # memory-mapped file, and writes through a mapping over NFS are exactly the
+    # case it does not promise to survive; Garage's own documentation also
+    # names LMDB as the engine that corrupts on an unclean shutdown. Sqlite does
+    # ordinary writes and fsyncs, takes a POSIX lock that NFSv4 implements, and
+    # only ever has this one process as a client. It is slower, which is
+    # irrelevant at a few WAL segments a minute.
+    metadata_dir = "/var/lib/garage/meta"
+    data_dir = "/var/lib/garage/data"
+    db_engine = "sqlite"
+
+    # Both on. This store holds the only copy of the database that survives
+    # losing the TrueNAS box, so a power cut that loses the last acknowledged
+    # WAL segment is exactly the failure it exists to rule out. The cost is
+    # latency per object, and nothing waits on this store but the archiver.
+    metadata_fsync = true
+    data_fsync = true
+
+    # A copy of the metadata database beside it, once a day. With one node and
+    # one copy, a corrupted metadata database has no peer to rebuild from, and
+    # without the metadata the data blocks are unaddressable.
+    metadata_auto_snapshot_interval = "24h"
+
+    # One node, one copy, for the reasons in `../../garage/app/configmap.yaml`.
+    # Durability is the QNAP's RAID; the point of this store is that it is a
+    # different box from the one the database runs on.
+    replication_factor = 1
+
+    # Loopback only. There is no second node to talk to, and the CLI that
+    # `kubectl exec` runs inside this pod is the only RPC client.
+    rpc_bind_addr = "127.0.0.1:3901"
+    rpc_public_addr = "127.0.0.1:3901"
+
+    # ⚠️ LOOPBACK, AND THAT IS THE TLS. Plain S3 answers only inside the pod; the
+    # `tls` container in `statefulset.yaml` is the one listener on the network,
+    # and it forwards here. Bind this to `[::]` and the plaintext port is
+    # reachable by anything the NetworkPolicy lets through, with the
+    # credentials and every WAL segment in the clear.
+    #
+    # Path-style addressing only, so no `root_domain`: the bucket is the first
+    # path segment, and there is no wildcard DNS for virtual-host style.
+    [s3_api]
+    s3_region = "garage"
+    api_bind_addr = "127.0.0.1:3900"
+
+    # No `[s3_web]` at all. The anonymous endpoint is the part of Garage that
+    # serves objects without a signature, and nothing should ever read a
+    # backup without one.
+
+    # On the pod address only because the kubelet's readiness probe reads
+    # `/health` here; every other admin endpoint wants `admin-token`, and the
+    # NetworkPolicy admits nothing to this port.
+    [admin]
+    api_bind_addr = "[::]:3903"

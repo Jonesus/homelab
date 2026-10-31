@@ -1,0 +1,20 @@
+# Headless, so `garage-backup.garage-backup.svc.cluster.local` resolves straight to
+# the pod, and that name is the one in the certificate (`certificate.yaml`) and in
+# the ObjectStore's `endpointURL` in `apps/pilke/prerequisites/backup/`. All three
+# change together or TLS verification fails.
+#
+# One port. Plain S3, RPC and the admin API are not published: the first two are
+# bound to loopback and the third is for the kubelet's probe.
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage-backup
+  namespace: garage-backup
+spec:
+  clusterIP: None
+  selector:
+    app: garage-backup
+  ports:
+    - name: s3-tls
+      port: 3443
+      targetPort: 3443

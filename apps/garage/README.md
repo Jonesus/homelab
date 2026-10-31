@@ -122,9 +122,9 @@ with two schemes in it. Delete the probe afterwards.
   photographs in here are yours.
 - **Not multi-tenant.** One bucket, one key. A second app wanting storage gets
   its own of each, not a share of these.
-- **Not a WAL archive — yet.** It could be: CloudNativePG can only archive WAL
-  to an object store, and one now exists, which is the difference between the
-  nightly snapshot's recovery point and a real point-in-time one. It is not
-  wired up because barman-cloud's compatibility with anything that is not AWS or
-  MinIO has a poor record, and that is worth proving on a scratch cluster before
-  the database depends on it.
+- **Not the WAL archive.** That is `../garage-backup`, a second Garage whose
+  volume is on the QNAP. A bucket here would land on the TrueNAS beside the
+  database it backs up, since Garage has no per-bucket placement. The worry
+  about barman-cloud and non-AWS S3 is answered there the way this README
+  asked: a throwaway cluster proves the store before the database depends on
+  it (`../pilke/restore-drill/README.md`).

@@ -1,0 +1,22 @@
+# The certificate the `tls` container in `statefulset.yaml` serves.
+#
+# `internal-ca` because the only client is in-cluster and has to be told which CA
+# to trust anyway. The client side of that is
+# `apps/pilke/prerequisites/backup/endpoint-ca.yaml`, which gets the same CA's
+# certificate into `pilke` so barman-cloud can verify this one.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: garage-backup-tls
+  namespace: garage-backup
+spec:
+  secretName: garage-backup-tls
+  dnsNames:
+    - garage-backup.garage-backup.svc.cluster.local
+    - garage-backup.garage-backup.svc
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: internal-ca
+    kind: ClusterIssuer
