@@ -1,0 +1,75 @@
+# Where `pilke-postgres` archives its WAL and its base backups: the `pilke-postgres`
+# bucket on the Garage in `apps/garage-backup`, which is on the QNAP rather than
+# the TrueNAS box this database's volume is on. Objects land under
+# `s3://pilke-postgres/pilke-postgres/` — the second segment is the server name,
+# which defaults to the Cluster's name.
+#
+# ⚠️ AN ARCHIVE THAT FAILS DOES NOT FAIL QUIETLY, IT FILLS THE DATABASE'S DISK.
+# Postgres keeps every WAL segment it has not managed to archive, on the 10Gi
+# volume in `../database.yaml`, and stops accepting writes when that is full. So a
+# QNAP that is down for days is, eventually, a Pilke outage.
+# `kubectl cnpg status pilke-postgres -n pilke` shows the last archived and the
+# last failed segment; check it after anything that touches this file, the
+# garage-backup namespace or the QNAP.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: pilke-postgres-qnap
+  namespace: pilke
+spec:
+  # A recovery window, not an age limit. Barman keeps whatever is needed to
+  # restore to any moment in the last 30 days, which includes the newest base
+  # backup older than that — so the oldest data in the bucket is up to about 31
+  # days old.
+  #
+  # ⚠️ THIS IS ALSO A PRIVACY NUMBER. A deleted account stays in these backups
+  # until it ages out, for exactly this long. The privacy statement already
+  # promises 30 days for telemetry; it has to say the same about backups, or
+  # this has to change to match what it says.
+  retentionPolicy: "30d"
+
+  configuration:
+    destinationPath: s3://pilke-postgres/
+    # The headless Service's name, which is also the certificate's
+    # `dnsNames`. barman-cloud verifies it against `endpointCA` below.
+    endpointURL: https://garage-backup.garage-backup.svc.cluster.local:3443
+    endpointCA:
+      name: pilke-backup-endpoint-ca
+      key: ca.crt
+    s3Credentials:
+      accessKeyId:
+        name: pilke-backup-s3
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: pilke-backup-s3
+        key: ACCESS_SECRET_KEY
+      # `garage`, the `s3_region` that store is configured with. SigV4 signs
+      # the region, so boto3's default of us-east-1 is refused as a bad
+      # signature rather than as a wrong region.
+      region:
+        name: pilke-backup-s3
+        key: ACCESS_REGION
+    wal:
+      compression: gzip
+      # Two at a time, so an archive that fell behind while the QNAP was down
+      # catches up at twice the pace.
+      maxParallel: 2
+    data:
+      compression: gzip
+      jobs: 2
+    # No `encryption:`. Its two values are SSE-S3 and SSE-KMS, and Garage
+    # implements neither; it implements SSE-C, which this plugin release cannot
+    # send yet. See `apps/garage-backup/README.md`.
+
+  instanceSidecarConfiguration:
+    env:
+      # boto3 from 1.36 sends CRC checksums on every upload by default, and
+      # S3 implementations other than AWS's have refused them in ways that
+      # read as a signature error. This is the plugin's documented workaround
+      # (plugin-barman-cloud#393). Garage may well accept the checksums; the
+      # restore drill is what proves it either way, and these two lines are
+      # cheaper than finding out from a failed archive.
+      - name: AWS_REQUEST_CHECKSUM_CALCULATION
+        value: when_required
+      - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+        value: when_required

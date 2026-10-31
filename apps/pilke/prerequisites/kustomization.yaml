@@ -11,5 +11,15 @@ resources:
   # from the same sync that creates it. What is live and what is staged is in
   # that directory's own kustomization.
   - network-policy
+  # ⚠️ NOT LISTED YET, ON PURPOSE: backups. `backup/` needs a sealed Garage key
+  # that cannot exist until `apps/garage-backup` is running and bootstrapped, and
+  # `backup/cluster-archiving.yaml` restarts the database. Uncomment this line
+  # and the patch below in one commit, in a maintenance window, after the steps
+  # in `../README.md`.
+  #
+  # - backup
+
+# patches:
+#   - path: backup/cluster-archiving.yaml
 
 namespace: pilke

@@ -1,0 +1,47 @@
+# Point-in-time recovery: `cluster.yaml` stopped at a chosen moment instead of at
+# the end of the archive. Edit ONE of the two targets below before applying.
+#
+# `targetName` is the precise one, and the drill in README.md uses it: a restore
+# point created on production with `pg_create_restore_point()` at the moment the
+# row counts were taken, so the restored counts must match exactly. CNPG cannot
+# work out which base backup precedes a named point, so it also needs `backupID`.
+#
+# `targetTime` is what a real incident uses — "just before the bad migration at
+# 09:41" — and CNPG picks the base backup itself. Give it an explicit offset:
+# a timestamp without one is read in the server's zone, which is UTC.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pilke-postgres-drill
+  namespace: pilke-restore-drill
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgis:17-3.5-9
+  instances: 1
+
+  bootstrap:
+    recovery:
+      source: pilke-postgres
+      recoveryTarget:
+        # From `kubectl -n pilke get backups -o custom-columns=...` in README.md:
+        # the newest backup that finished BEFORE the restore point was created.
+        backupID: "REPLACE-ME"
+        targetName: "REPLACE-ME"
+        # Or, instead of the two lines above:
+        # targetTime: "2026-11-03 09:40:00+02:00"
+
+  externalClusters:
+    - name: pilke-postgres
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: pilke-postgres-qnap
+          serverName: pilke-postgres
+
+  storage:
+    pvcTemplate:
+      storageClassName: iscsi
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi

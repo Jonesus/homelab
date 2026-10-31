@@ -1,0 +1,12 @@
+# Scratch space for restore drills. Created at the start of a drill and deleted at
+# the end, so between drills it does not exist.
+#
+# ⚠️ NOT SYNCED BY ARGO, ON PURPOSE. Nothing under `apps/pilke/restore-drill/` is
+# referenced by an Application: these are applied by hand, following README.md in
+# this directory. An Application here would recreate the drill cluster every
+# time it is torn down, and a restored copy of the production database that
+# never goes away is a second production database nobody looks after.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pilke-restore-drill

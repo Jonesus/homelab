@@ -1,0 +1,35 @@
+# A throwaway, empty cluster that archives into the backup store, so the write
+# path is proven BEFORE `pilke-postgres` depends on it.
+#
+# `../../garage/README.md` records the reason this step exists: barman-cloud has a
+# poor record against S3 implementations that are not AWS or MinIO, and a
+# production archive that fails does not fail quietly — Postgres keeps the
+# unarchived WAL on its own volume until the volume is full. This cluster takes
+# that risk instead, with nothing in it.
+#
+# Its own `serverName`, so its objects sit under `s3://pilke-postgres/backup-proof/`
+# and never beside production's. They are a few megabytes and can stay.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: backup-proof
+  namespace: pilke-restore-drill
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgis:17-3.5-9
+  instances: 1
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: pilke-postgres-qnap
+        serverName: backup-proof
+
+  storage:
+    pvcTemplate:
+      storageClassName: iscsi
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi

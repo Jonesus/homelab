@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# The backup half of `../database.yaml`. `cluster-archiving.yaml` is not listed
+# here because it is a patch on a resource this directory does not own; the
+# parent kustomization applies it.
+resources:
+  - endpoint-ca.yaml
+  # Produced by `../../create-secrets.bash` from `backup-s3.unsealed.yaml`,
+  # which is gitignored. It holds the Garage key `apps/garage-backup/README.md`
+  # mints, so it cannot exist before that store has been bootstrapped.
+  - backup-s3.sealed.yaml
+  - object-store.yaml
+  - scheduled-backup.yaml
+
+namespace: pilke
