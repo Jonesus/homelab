@@ -62,9 +62,13 @@ spec:
           ports:
             - name: admin
               containerPort: 3903
-          # As in `../../garage`: the admin API answers before a layout exists,
-          # so the pod is Ready on a fresh install and the bootstrap is a
-          # separate, visible step rather than a pod that never comes up.
+          # `/health` answers 503 until a layout is assigned, so it is readiness
+          # only: an unready pod on a fresh install is the visible sign that the
+          # bootstrap is owed. Liveness is a TCP check on the admin port, which
+          # listens from startup. `../../garage` checks S3 on 3900, but here S3
+          # is bound to loopback where the kubelet cannot reach it. A liveness
+          # probe on `/health` restarts the pod every two minutes before the
+          # bootstrap can run.
           readinessProbe:
             httpGet:
               path: /health
@@ -72,8 +76,7 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
-            httpGet:
-              path: /health
+            tcpSocket:
               port: 3903
             initialDelaySeconds: 20
             periodSeconds: 30
