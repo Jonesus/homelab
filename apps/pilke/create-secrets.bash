@@ -17,3 +17,4 @@ seal database-user
 seal app-secrets
 seal ghcr-pull
 seal backup/backup-s3
+seal grafana-admin

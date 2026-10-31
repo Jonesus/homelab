@@ -7,6 +7,9 @@ resources:
   - database-user.sealed.yaml
   - app-secrets.sealed.yaml
   - ghcr-pull.sealed.yaml
+  # Grafana's admin login. The chart generates a random one per render when
+  # it is not given one, which leaves pilke-grafana permanently OutOfSync.
+  - grafana-admin.sealed.yaml
   # Here, in wave -1 with the database, so the policy that guards Postgres exists
   # from the same sync that creates it. What is live and what is staged is in
   # that directory's own kustomization.

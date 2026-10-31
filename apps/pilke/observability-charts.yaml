@@ -402,6 +402,12 @@ spec:
     helm:
       releaseName: pilke
       valuesObject:
+        # The login lives in the sealed `pilke-grafana-admin` (prerequisites), so
+        # the chart renders no Secret of its own with a fresh random password.
+        admin:
+          existingSecret: pilke-grafana-admin
+          userKey: admin-user
+          passwordKey: admin-password
         # ⚠️ Installed at pod start with grafana-cli, so this pod needs egress
         # to grafana.com to become ready. VictoriaTraces needs no plugin — it
         # speaks the Jaeger query API, which Grafana ships with — so this list
