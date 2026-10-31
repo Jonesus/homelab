@@ -1,3 +1,4 @@
 talos/
 *.unsealed.yaml
 
+.env
