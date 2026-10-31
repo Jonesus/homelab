@@ -21,7 +21,7 @@ spec:
           # published (no stable release has been cut as of 2026-05).
           # `:dev` is a mutable rolling tag (rebuilt on every push to
           # anszom/rethink master), so always re-pull to track mainline.
-          image: ghcr.io/anszom/rethink:dev
+          image: ghcr.io/anszom/rethink:dev@sha256:5c1f35ff61764335089c989787ce9e1f5dbb210d10bc299a3179b2db3e6ef24e
           imagePullPolicy: Always
           ports:
             - containerPort: 4433

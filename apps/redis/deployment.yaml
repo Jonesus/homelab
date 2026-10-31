@@ -18,9 +18,9 @@ spec:
       containers:
         # Pinned by digest. The data on the volume is in the RDB format of the
         # Redis that wrote it, and an older Redis refuses to start on it
-        # ("Can't handle RDB format version"); `redis:alpine` resolved to
-        # whatever each node had cached, so a pod that moved node could not
-        # start. Bump deliberately, never downwards.
+        # ("Can't handle RDB format version"). A floating tag resolves to
+        # whatever the node the pod lands on has cached, which can be older.
+        # Bump deliberately, never downwards.
         - image: redis:8.10.1-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
           name: redis
           ports:

@@ -25,10 +25,10 @@ spec:
             # ⚠️ A RELEASE, PINNED BY DIGEST, and the same one as the node plugin
             # below. A floating tag (`next`, `latest`) is pulled afresh whenever
             # a pod lands on a node that has not cached it, so a node drain can
-            # swap the storage driver for whatever was published that week; a
-            # `next` that refused the API key over plain http once stopped every
-            # iSCSI volume attaching. Bump both together, after a throwaway PVC
-            # has been provisioned, attached and written with the new one.
+            # swap the storage driver for whatever was published that week, and
+            # a driver that cannot reach the TrueNAS API attaches no iSCSI volume
+            # anywhere. Bump both together, after a throwaway PVC has been
+            # provisioned, attached and written with the new one.
             image:
               registry: docker.io/democraticcsi/democratic-csi
               tag: v1.9.5@sha256:fc3b7d7ed3a616714139525075312758e23a5d425ffb539ad12c9bd20fb6001f
