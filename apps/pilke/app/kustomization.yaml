@@ -52,19 +52,20 @@ namespace: pilke
 configMapGenerator:
   - name: pilke-build-floor
     literals:
-      # Android `versionCode` 30 and iOS build 24 are the same release: the demo
-      # builds on Expo SDK 58, on the `production` update channel. The two platforms
+      # Android `versionCode` 32 and iOS build 25 are the same release: the demo
+      # builds on Expo SDK 58, on the `production` update channel, with the earlier
+      # purpose strings. The two platforms
       # count separately and every build calls itself `1.0.0`, so these numbers are
       # the whole of what "current" means.
       #
       # ⚠️ **No `eas update` from main can reach anything older.** Main's runtime
       # fingerprint is these builds', so a phone below them would never be offered
       # another fix, and raising these is the only thing that asks it to update.
-      - APP_MINIMUM_BUILD_ANDROID=30
-      - APP_MINIMUM_BUILD_IOS=24
+      - APP_MINIMUM_BUILD_ANDROID=32
+      - APP_MINIMUM_BUILD_IOS=25
       # Equal to the minimum, so the notice band is empty and anything below the
       # current build is walled rather than asked. The owner's call for a host
       # being tested by hand; on one with real users these should sit a release
       # or two above the minimum.
-      - APP_RECOMMENDED_BUILD_ANDROID=30
-      - APP_RECOMMENDED_BUILD_IOS=24
+      - APP_RECOMMENDED_BUILD_ANDROID=32
+      - APP_RECOMMENDED_BUILD_IOS=25
