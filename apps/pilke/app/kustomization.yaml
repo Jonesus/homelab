@@ -54,9 +54,8 @@ configMapGenerator:
     literals:
       # Android `versionCode` 32 and iOS build 25 are the same release: the demo
       # builds on Expo SDK 58, on the `production` update channel, with the earlier
-      # purpose strings. The two platforms
-      # count separately and every build calls itself `1.0.0`, so these numbers are
-      # the whole of what "current" means.
+      # purpose strings. The two platforms count separately and every build calls
+      # itself `1.0.0`, so these numbers are the whole of what "current" means.
       #
       # ⚠️ **No `eas update` from main can reach anything older.** Main's runtime
       # fingerprint is these builds', so a phone below them would never be offered
