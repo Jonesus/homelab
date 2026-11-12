@@ -19,6 +19,26 @@ spec:
       valuesObject:
         publishService:
           enabled: true
+        controller:
+          service:
+            # Keep the client's address. With the default `Cluster`, kube-proxy
+            # SNATs traffic arriving at the MetalLB address to a node's own, so
+            # nginx (and every app behind it) sees a cluster node for every
+            # visitor. `Local` delivers only to a node running the controller --
+            # MetalLB's L2 speaker announces the address from that node -- and
+            # leaves the source alone. Pilke's per-address login limits count on
+            # it (treffit-backend `client_address.py`); with `Cluster` they saw
+            # only private addresses and counted nobody.
+            externalTrafficPolicy: Local
+          config:
+            # The defaults, written down because the login limits depend on them:
+            # nginx sets X-Forwarded-For to the peer it accepted the connection
+            # from and ignores whatever the client sent, so the one hop the API
+            # trusts is this one. `use-forwarded-headers: "true"` would trust a
+            # client's own header from anywhere (`proxy-real-ip-cidr` defaults to
+            # 0.0.0.0/0), and there is no proxy in front of nginx to trust.
+            use-forwarded-headers: "false"
+            compute-full-forwarded-for: "false"
   syncPolicy:
     automated:
       prune: true
