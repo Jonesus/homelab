@@ -25,3 +25,15 @@ spec:
                 name: home-assistant
                 port:
                   number: 8080
+    # Legacy name, here rather than in the chart's Ingress because that one
+    # also serves the public hassio.boiss.it and cannot carry the allowlist.
+    - host: hass.home
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: home-assistant
+                port:
+                  number: 8080
