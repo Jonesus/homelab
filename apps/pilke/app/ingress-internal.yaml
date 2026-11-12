@@ -5,6 +5,7 @@ metadata:
   namespace: pilke
   annotations:
     cert-manager.io/cluster-issuer: "internal-ca"
+    nginx.ingress.kubernetes.io/allowlist-source-range: "192.168.0.0/16,10.0.0.0/8"
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     # nginx defaults to 1m and a phone-camera photograph through
     # POST /users/me/photo will exceed it and 413.

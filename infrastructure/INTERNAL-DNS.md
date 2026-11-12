@@ -5,7 +5,24 @@ manual steps needed to activate it.
 
 `.internal` is reserved by ICANN (July 2024) for private internal use, in the
 same spirit as `home.arpa` but easier to type. It will never resolve on the
-public DNS, so requests can never leak.
+public DNS, but that alone does not keep these hosts private: the router
+forwards 80/443 on the public address to the same ingress-nginx, and nginx
+routes by the Host header the client sends. Anyone on the internet can send
+`Host: argo.internal` to the public address.
+
+What does keep them private is the annotation every LAN-only Ingress carries
+(the `*.internal` ones and the legacy `argo.home` / `hass.home`):
+
+```yaml
+nginx.ingress.kubernetes.io/allowlist-source-range: "192.168.0.0/16,10.0.0.0/8"
+```
+
+The LAN and the cluster's pod and Service ranges; anything else gets a 403.
+It only works because the ingress-nginx Service has `externalTrafficPolicy:
+Local` (see `ingress-nginx/app.yaml`): with `Cluster`, kube-proxy SNATs every
+outside request to a node address in 192.168.1.0/24 and the allowlist lets the
+whole internet through. No IPv6 range: the ingress has only an IPv4 address and
+the `*.internal` rewrite answers only A records.
 
 ## Architecture
 
@@ -132,6 +149,7 @@ metadata:
   namespace: <ns>
   annotations:
     cert-manager.io/cluster-issuer: "internal-ca"
+    nginx.ingress.kubernetes.io/allowlist-source-range: "192.168.0.0/16,10.0.0.0/8"
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   ingressClassName: nginx

@@ -35,10 +35,6 @@ spec:
               paths:
                 - path: /
                   pathType: ImplementationSpecific
-            - host: hass.home
-              paths:
-                - path: /
-                  pathType: ImplementationSpecific
 
         configuration:
           enabled: true

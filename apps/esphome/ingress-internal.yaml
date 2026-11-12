@@ -5,6 +5,7 @@ metadata:
   namespace: homeassistant
   annotations:
     cert-manager.io/cluster-issuer: "internal-ca"
+    nginx.ingress.kubernetes.io/allowlist-source-range: "192.168.0.0/16,10.0.0.0/8"
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     # The dashboard streams compile logs over a websocket.
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"

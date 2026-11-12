@@ -58,6 +58,7 @@ metadata:
   namespace: pilke
   annotations:
     cert-manager.io/cluster-issuer: "internal-ca"
+    nginx.ingress.kubernetes.io/allowlist-source-range: "192.168.0.0/16,10.0.0.0/8"
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     # ExternalName upstreams are resolved by name at request time rather than
     # from the endpoints list, which is what makes a cross-namespace Service
