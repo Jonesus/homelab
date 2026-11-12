@@ -5,6 +5,9 @@ metadata:
   namespace: adguard
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # The whole UI is the admin, and whoever gets in steers the LAN's DNS. No DoH is
+    # served here (/dns-query is a 404), so nothing outside the LAN needs this host.
+    nginx.ingress.kubernetes.io/allowlist-source-range: "192.168.0.0/16,10.0.0.0/8"
 spec:
   ingressClassName: nginx
   tls:
