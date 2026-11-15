@@ -25,6 +25,11 @@ spec:
       app: pilke-worker
   template:
     metadata:
+      # What `kubectl rollout restart` writes, in git: a changed pod template is
+      # the only thing that makes Argo replace the pods and so re-read
+      # `pilke-config`. Bump it with a commit that changes that ConfigMap.
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-11-15T16:50:00+02:00"
       labels:
         app: pilke-worker
     spec:
