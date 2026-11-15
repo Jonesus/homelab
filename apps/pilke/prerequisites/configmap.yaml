@@ -341,3 +341,11 @@ data:
   # visible core spends longer coordinating than computing, and the worker's
   # limit of one CPU makes those threads fight over a single core.
   OPENBLAS_NUM_THREADS: "1"
+
+  # Matching v2 (`treffit-backend/docs/plans/matching-vectors.md`): draws are ranked
+  # by the new score, and the views chips are asked and counted between two people
+  # who have both consented. Every weight stays at its default, `MATCHING_W_FEEDBACK`
+  # at 0 included: the feedback term switches itself on once enough questionnaires
+  # exist. `MATCHING_SAMPLE` stays off.
+  MATCHING_V2_ENABLED: "true"
+  MATCHING_VIEWS_ENABLED: "true"
