@@ -344,8 +344,10 @@ data:
 
   # Matching v2 (`treffit-backend/docs/plans/matching-vectors.md`): draws are ranked
   # by the new score, and the views chips are asked and counted between two people
-  # who have both consented. Every weight stays at its default, `MATCHING_W_FEEDBACK`
-  # at 0 included: the feedback term switches itself on once enough questionnaires
-  # exist. `MATCHING_SAMPLE` stays off.
+  # who have both consented. The feedback fit's weight is set here because its code
+  # default is 0; at 1.0 it still counts only once 100 questionnaires with chips exist
+  # in the last 12 months. Every other weight stays at its default, and
+  # `MATCHING_SAMPLE` stays off.
   MATCHING_V2_ENABLED: "true"
   MATCHING_VIEWS_ENABLED: "true"
+  MATCHING_W_FEEDBACK: "1.0"
