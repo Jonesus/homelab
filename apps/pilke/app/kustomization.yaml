@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - migrate-job.yaml
+  - rebuild-matching-job.yaml
   - deployment-api.yaml
   - deployment-worker.yaml
   - deployment-scheduler.yaml

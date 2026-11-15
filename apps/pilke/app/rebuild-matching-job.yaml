@@ -1,0 +1,71 @@
+# One run of the nightly `rebuild_matching_profiles`, so matching v2 has profiles,
+# a baseline, taste neighbours and a pooled model before `MATCHING_V2_ENABLED` is
+# switched on, rather than waiting for 04:30.
+#
+# A plain Job rather than a hook: Argo creates it once and then leaves it, and the
+# task is idempotent, so a second run would only write the same values again. No
+# `ttlSecondsAfterFinished`, because a Job the cluster deletes is one Argo would
+# create again on its next sync. Delete this file once the run has finished.
+#
+# Labelled `pilke-migrate` because that is the label the network policies already
+# give a one-off Job: the database, and the collector its logs and traces go to.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pilke-rebuild-matching-20261115
+  namespace: pilke
+  labels:
+    app: pilke-migrate
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app: pilke-migrate
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: rebuild
+          image: ghcr.io/boissit/treffit-backend:sha-29d1e82
+          command:
+            - python
+            - manage.py
+            - shell
+            - -c
+            - |
+              from treffit_backend.dates.tasks import rebuild_matching_profiles
+              print("rebuild_matching_profiles: " + rebuild_matching_profiles.call(), flush=True)
+          envFrom:
+            - configMapRef:
+                name: pilke-config
+            - secretRef:
+                name: pilke-app-secrets
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pilke-postgres-user
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pilke-postgres-user
+                  key: password
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
