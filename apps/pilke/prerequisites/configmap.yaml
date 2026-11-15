@@ -335,3 +335,9 @@ data:
   # carries a content hash and bumping one rolls `pilke-api` on its own. Put
   # them back here and they inherit this file's footgun: live in git, dead in
   # the cluster, until somebody remembers to restart the pods.
+
+  # One BLAS thread per process. The nightly `rebuild_matching_profiles` trains
+  # the pooled model on small matrices, where OpenBLAS's default of a thread per
+  # visible core spends longer coordinating than computing, and the worker's
+  # limit of one CPU makes those threads fight over a single core.
+  OPENBLAS_NUM_THREADS: "1"
