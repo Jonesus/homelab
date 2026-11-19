@@ -121,6 +121,16 @@ binary_sensor:
 # and the candles report nothing back, so there is deliberately no level
 # tracking here and no light entity pretending to know a brightness.
 button:
+  # Wake-on-LAN for the Samsung Frame TV (wired MAC, static lease .150 in
+  # homenet/mikrotik/dhcp.tf). Home Assistant runs on the pod network, so its
+  # own WoL broadcast never reaches the LAN; this device sits on the LAN and
+  # can. Needs "Power On with Mobile" enabled on the TV. HA's Samsung TV
+  # integration triggers this from a `turn_on` automation.
+  - platform: wake_on_lan
+    name: Frame TV Wake
+    icon: mdi:television
+    target_mac_address: 38:8C:EF:BB:B5:FB
+
   - platform: template
     name: Candles On
     icon: mdi:candle
