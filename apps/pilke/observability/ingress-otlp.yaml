@@ -3,12 +3,12 @@
 # whole of the attack surface telemetry adds, and it is referenced from
 # `kustomization.yaml` only because both of the things that gate it hold:
 #
-#   1. The legal gate. Collecting from a tester's phone is defensible while the
-#      published privacy statement describes error and performance telemetry —
-#      *Virheet ja suorituskyky* / *Errors and diagnostics*, with a legitimate
-#      interest and a 30-day retention the two stores enforce themselves. That
-#      text is in `pilke-web` and nothing here can verify it; a change that
-#      removes it is a reason to remove this file.
+#   1. The legal gate. Collecting from a phone is defensible only while the
+#      published privacy statement describes the app's error and performance
+#      telemetry, with its basis and the 30-day retention the two stores
+#      enforce themselves. That text is in `pilke-web` and nothing here can
+#      verify it. This Ingress collects nothing until an app build carries the
+#      key, so the build is what must wait for the text.
 #   2. The collector requires an ingest key. `collector-config.yaml` carries a
 #      `bearertokenauth` extension on a second OTLP receiver, and this Ingress
 #      routes to that receiver's port and not to the open one — see the backend
@@ -16,7 +16,8 @@
 #
 # ⚠️ THE KEY IS OBFUSCATION AND NOT A SECRET. It ships inside the app's JS
 # bundle, so everybody holding the APK holds it. It keeps a scanner from
-# finding an open ingest and it can be rotated; it does not make this endpoint
+# finding an open ingest and it can be rotated with
+# `../rotate-otlp-ingest-key.bash`; it does not make this endpoint
 # private, and the rate limits below are what actually bound abuse by somebody
 # who has read the bundle.
 #

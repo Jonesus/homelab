@@ -39,10 +39,9 @@ resources:
   # is worth reading twice.
   #
   # The other gate is not in this repository and cannot be checked from it: the
-  # published privacy statement has to describe error and performance telemetry
-  # before an app build sends any — it does, under *Virheet ja suorituskyky* /
-  # *Errors and diagnostics*, with a basis and a 30-day retention that the
-  # stores actually enforce. This Ingress landing first collects nothing on its
+  # published privacy statement has to describe the app's error and performance
+  # telemetry, with a basis and the 30-day retention the stores enforce, before
+  # an app build sends any. This Ingress landing first collects nothing on its
   # own; the app build pointed at it is the step that must not go first.
   #
   # ⚠️ Its `proxy-body-size: 1m` is why this is a second Ingress object rather
