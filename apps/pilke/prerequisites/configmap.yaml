@@ -352,14 +352,13 @@ data:
   MATCHING_VIEWS_ENABLED: "true"
   MATCHING_W_FEEDBACK: "1.0"
 
-  # Identity verification (treffit-backend `docs/identity-verification.md`), all
-  # commented out: the code defaults are the flag OFF and the provider that
-  # refuses. Uncomment in this order, and only after the Didit console checklist in
-  # treffit-backend `docs/releasing.md` (model training switched off first) and the
-  # three sealed secrets in ../README.md: the provider and the return URL, then the
-  # flag for testers, and the flag for everybody last.
-  # IDENTITY_PROVIDER: "treffit_backend.identity.providers.didit.DiditIdentityProvider"
-  # IDENTITY_RETURN_BASE_URL: "https://api.pilke.app"
-  # IDENTITY_VERIFICATION_TESTERS_ENABLED: "true"
+  # Identity verification (treffit-backend `docs/identity-verification.md`). Didit
+  # through the sealed DIDIT_API_KEY, DIDIT_WEBHOOK_SECRET and IDENTITY_HASH_KEYS,
+  # the console checklist done (model training off, retention one month, the return
+  # host, the webhook). Testers first: IDENTITY_VERIFICATION_ENABLED, for everybody,
+  # waits for the privacy statement's identity section on pilke.app.
+  IDENTITY_PROVIDER: "treffit_backend.identity.providers.didit.DiditIdentityProvider"
+  IDENTITY_RETURN_BASE_URL: "https://api.pilke.app"
+  IDENTITY_VERIFICATION_TESTERS_ENABLED: "true"
   # IDENTITY_VERIFICATION_ENABLED: "true"
-  # IDENTITY_LOG_LEVEL: "DEBUG"   # names (never values) of the fields Didit returns
+  IDENTITY_LOG_LEVEL: "DEBUG"   # names (never values) of the fields Didit returns
