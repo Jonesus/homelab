@@ -95,7 +95,8 @@ stringData:
   TESTER_PHONE_NUMBERS: ""
 
   # Identity verification (treffit-backend `docs/identity-verification.md`).
-  # PLACEHOLDERS, not sealed yet: add them when the feature is switched on, after
+  # PLACEHOLDERS, not sealed yet: `../seal-identity-secrets.bash <dir>` merges all
+  # three into this SealedSecret. Add them when the feature is switched on, after
   # the Didit console checklist in treffit-backend `docs/releasing.md` (model
   # training OFF first). Absent is safe: the feature flag defaults to off and the
   # provider to the one that refuses.
