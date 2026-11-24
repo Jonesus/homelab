@@ -20,7 +20,7 @@ spec:
       # the only thing that makes Argo replace the pods and so re-read
       # `pilke-config`. Bump it with a commit that changes that ConfigMap.
       annotations:
-        kubectl.kubernetes.io/restartedAt: "2026-11-15T17:55:00+02:00"
+        kubectl.kubernetes.io/restartedAt: "2026-11-24T23:59:00+02:00"
       labels:
         app: pilke-api
     spec:

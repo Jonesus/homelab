@@ -355,10 +355,10 @@ data:
   # Identity verification (treffit-backend `docs/identity-verification.md`). Didit
   # through the sealed DIDIT_API_KEY, DIDIT_WEBHOOK_SECRET and IDENTITY_HASH_KEYS,
   # the console checklist done (model training off, retention one month, the return
-  # host, the webhook). Testers first: IDENTITY_VERIFICATION_ENABLED, for everybody,
-  # waits for the privacy statement's identity section on pilke.app.
+  # host, the webhook), and the privacy statement's identity section on pilke.app
+  # in force from 2026-11-24.
   IDENTITY_PROVIDER: "treffit_backend.identity.providers.didit.DiditIdentityProvider"
   IDENTITY_RETURN_BASE_URL: "https://api.pilke.app"
   IDENTITY_VERIFICATION_TESTERS_ENABLED: "true"
-  # IDENTITY_VERIFICATION_ENABLED: "true"
+  IDENTITY_VERIFICATION_ENABLED: "true"
   IDENTITY_LOG_LEVEL: "DEBUG"   # names (never values) of the fields Didit returns
