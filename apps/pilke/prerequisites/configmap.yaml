@@ -351,3 +351,15 @@ data:
   MATCHING_V2_ENABLED: "true"
   MATCHING_VIEWS_ENABLED: "true"
   MATCHING_W_FEEDBACK: "1.0"
+
+  # Identity verification (treffit-backend `docs/identity-verification.md`), all
+  # commented out: the code defaults are the flag OFF and the provider that
+  # refuses. Uncomment in this order, and only after the Didit console checklist in
+  # treffit-backend `docs/releasing.md` (model training switched off first) and the
+  # three sealed secrets in ../README.md: the provider and the return URL, then the
+  # flag for testers, and the flag for everybody last.
+  # IDENTITY_PROVIDER: "treffit_backend.identity.providers.didit.DiditIdentityProvider"
+  # IDENTITY_RETURN_BASE_URL: "https://api.pilke.app"
+  # IDENTITY_VERIFICATION_TESTERS_ENABLED: "true"
+  # IDENTITY_VERIFICATION_ENABLED: "true"
+  # IDENTITY_LOG_LEVEL: "DEBUG"   # names (never values) of the fields Didit returns

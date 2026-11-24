@@ -93,6 +93,23 @@ stringData:
   # ConfigMap is not a precedent — that number is invented and its code is
   # published on purpose.
   TESTER_PHONE_NUMBERS: ""
+
+  # Identity verification (treffit-backend `docs/identity-verification.md`).
+  # PLACEHOLDERS, not sealed yet: add them when the feature is switched on, after
+  # the Didit console checklist in treffit-backend `docs/releasing.md` (model
+  # training OFF first). Absent is safe: the feature flag defaults to off and the
+  # provider to the one that refuses.
+  #
+  # DIDIT_API_KEY: Didit Business Console → Developers → API keys.
+  # DIDIT_WEBHOOK_SECRET: the `secret_shared_key` of the webhook destination
+  #   https://api.pilke.app/webhooks/identity/didit.
+  # IDENTITY_HASH_KEYS: `k1:<base64 of 32 random bytes>`, made with
+  #   python3 -c "import base64,os; print('k1:' + base64.b64encode(os.urandom(32)).decode())"
+  #   ⚠️ Back it up OUTSIDE the cluster before sealing it: losing it loses every
+  #   one-account-per-person rule and every identity ban, with no way back.
+  # DIDIT_API_KEY: ""
+  # DIDIT_WEBHOOK_SECRET: ""
+  # IDENTITY_HASH_KEYS: ""
 ```
 
 **`ghcr-pull.unsealed.yaml`.** The only one that cannot be produced from this
