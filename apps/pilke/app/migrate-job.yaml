@@ -30,7 +30,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: migrate
-          image: ghcr.io/boissit/treffit-backend:sha-a62ca8d
+          image: ghcr.io/boissit/treffit-backend:sha-c5bd1d0
           command:
             - sh
             - -c
