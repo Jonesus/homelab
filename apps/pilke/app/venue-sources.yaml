@@ -10,10 +10,6 @@
 # tags together with the Deployments' — the sync reads the tables the same
 # release's migration made.
 #
-# ⚠️ SUSPENDED UNTIL THE FIRST REAL TAG. `sha-51bc1c2` names no image; set both
-# `image:` lines to the release that carries the hours queue (and its migration,
-# venues 0021) and remove both `suspend: true` in that commit.
-#
 # Two schedules, one volume. Weekly: every own-site, Hauki and Kirkanta reader, and
 # any Google place whose 28 days are up. Monthly: the same with `--google`, every
 # Google place read now. The Google pass is polite by construction (one place page
