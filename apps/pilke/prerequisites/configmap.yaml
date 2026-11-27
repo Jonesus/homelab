@@ -362,3 +362,13 @@ data:
   IDENTITY_VERIFICATION_TESTERS_ENABLED: "true"
   IDENTITY_VERIFICATION_ENABLED: "true"
   IDENTITY_LOG_LEVEL: "DEBUG"   # names (never values) of the fields Didit returns
+
+  # The venue hours sync (`app/venue-sources.yaml`). Its alert links the owner to
+  # the admin's queue, which is reached over the internal ingress.
+  ADMIN_BASE_URL: "https://pilke.internal"
+  # Off: a person approves every hours change, one click each in the admin. On, a
+  # recorded run approves the proposals the safe rule passes (same source and
+  # reader as before, confirmed by the next run or a second source, nothing
+  # flagged) and queues the rest. The admin shows what it would approve either way
+  # (filter "auto eligible"); treffit-backend docs/venues.md §6.
+  VENUE_HOURS_AUTO_APPLY: "false"

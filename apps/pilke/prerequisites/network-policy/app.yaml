@@ -47,6 +47,8 @@ spec:
           - pilke-worker
           - pilke-scheduler
           - pilke-migrate
+          # The venue hours sync, `../../app/venue-sources.yaml`.
+          - pilke-venue-sources
   policyTypes:
     - Egress
   egress:
@@ -195,3 +197,39 @@ spec:
       ports:
         - protocol: TCP
           port: 3443
+---
+# ---------------------------------------------------------------------------
+# Out, for the venue hours sync only: the venues' own sites, Hauki, Kirkanta,
+# the Overpass mirrors and Google Maps, and PostStack for the owner's alert.
+#
+# Port 80 as well as 443, unlike the API's rule: a venue's site is whatever its
+# owner runs, and a few still answer on plain HTTP (the fetcher follows their
+# redirect to HTTPS where there is one). Everything private stays closed, as
+# above. The database and the collector are `pilke-app-egress`'s.
+# ---------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pilke-venue-sources-egress
+  namespace: pilke
+spec:
+  podSelector:
+    matchLabels:
+      app: pilke-venue-sources
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 100.64.0.0/10
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

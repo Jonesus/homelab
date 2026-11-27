@@ -16,6 +16,8 @@ resources:
   - ingress.yaml
   - assets-route-public.yaml
   - db-dump.yaml
+  # The weekly and monthly venue hours sync, and its volume.
+  - venue-sources.yaml
 
 namespace: pilke
 

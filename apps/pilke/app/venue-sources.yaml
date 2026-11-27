@@ -1,0 +1,197 @@
+# The venue hours sync: `manage.py venue_sources --record`, which reads every
+# venue's hours from its own site, Hauki, Kirkanta, Google Maps and OpenStreetMap,
+# queues each change as an hours proposal for the admin (Venues > Hours proposals),
+# and mails the owner when it found something. treffit-backend docs/venues.md §5-§6.
+#
+# ⚠️ ITS OWN IMAGE, `treffit-backend-sync`, NOT THE SERVER'S. The run drives a
+# headless Chromium (Playwright) for rendered pages and Google Maps, and the server
+# image is kept without it. CI publishes both from the same commit with the same
+# `sha-<7>` tags (treffit-backend `Dockerfile.sync`, `cicd.yml`), so bump these two
+# tags together with the Deployments' — the sync reads the tables the same
+# release's migration made.
+#
+# ⚠️ SUSPENDED UNTIL THE FIRST REAL TAG. `sha-0000000` names no image; set both
+# `image:` lines to the release that carries the hours queue (and its migration,
+# venues 0021) and remove both `suspend: true` in that commit.
+#
+# Two schedules, one volume. Weekly: every own-site, Hauki and Kirkanta reader, and
+# any Google place whose 28 days are up. Monthly: the same with `--google`, every
+# Google place read now. The Google pass is polite by construction (one place page
+# at a time, 10-15 s apart, robots.txt obeyed, no CAPTCHA solving, no retries, no
+# address or fingerprint rotation) and stops for the run at the first wall.
+#
+# The volume holds the previous run's proposal file — each Google place's last
+# reading, page fingerprints, failure counts — and the cache that lets `--offline`
+# reproduce a run. Without it every weekly run would read every Google place.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pilke-venue-sources
+  namespace: pilke
+spec:
+  storageClassName: iscsi
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pilke-venue-sources-weekly
+  namespace: pilke
+  labels:
+    app: pilke-venue-sources
+spec:
+  suspend: true
+  schedule: "0 6 * * 1"
+  timeZone: Europe/Helsinki
+  # Forbid, and the monthly one runs three hours after a Monday's weekly: one
+  # ReadWriteOnce volume, and a run reads the proposal file the previous one wrote.
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # A failed run is not retried: a retry is a second round of requests to
+      # every venue's site, and Google's wall is not something to knock on twice.
+      backoffLimit: 0
+      activeDeadlineSeconds: 5400
+      template:
+        metadata:
+          labels:
+            app: pilke-venue-sources
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          imagePullSecrets:
+            - name: ghcr-pull
+          containers:
+            - name: venue-sources
+              image: ghcr.io/boissit/treffit-backend-sync:sha-0000000
+              command: ["python", "manage.py", "venue_sources", "--record", "--dir", "/data"]
+              envFrom:
+                - configMapRef:
+                    name: pilke-config
+                - secretRef:
+                    name: pilke-app-secrets
+              env:
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef: {name: pilke-postgres-user, key: username}
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef: {name: pilke-postgres-user, key: password}
+                # Nothing reads spans from a run once a week; the Job's log is
+                # the record.
+                - name: OTEL_SDK_DISABLED
+                  value: "true"
+              volumeMounts:
+                - {name: data, mountPath: /data}
+                - {name: tmp, mountPath: /tmp}
+                # Chromium's shared memory. The container default is 64 MB,
+                # which a Maps page outgrows.
+                - {name: shm, mountPath: /dev/shm}
+              resources:
+                requests: {cpu: 100m, memory: 512Mi}
+                limits: {cpu: "1", memory: 1536Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: {drop: [ALL]}
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: pilke-venue-sources
+            - name: tmp
+              emptyDir:
+                sizeLimit: 1Gi
+            - name: shm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 512Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pilke-venue-sources-google
+  namespace: pilke
+  labels:
+    app: pilke-venue-sources
+spec:
+  suspend: true
+  # The 1st at 09:00: three hours after a weekly run that falls on the same day,
+  # which it then shares the day's cache with.
+  schedule: "0 9 1 * *"
+  timeZone: Europe/Helsinki
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 5400
+      template:
+        metadata:
+          labels:
+            app: pilke-venue-sources
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          imagePullSecrets:
+            - name: ghcr-pull
+          containers:
+            - name: venue-sources
+              image: ghcr.io/boissit/treffit-backend-sync:sha-0000000
+              command: ["python", "manage.py", "venue_sources", "--record", "--google", "--dir", "/data"]
+              envFrom:
+                - configMapRef:
+                    name: pilke-config
+                - secretRef:
+                    name: pilke-app-secrets
+              env:
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef: {name: pilke-postgres-user, key: username}
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef: {name: pilke-postgres-user, key: password}
+                - name: OTEL_SDK_DISABLED
+                  value: "true"
+              volumeMounts:
+                - {name: data, mountPath: /data}
+                - {name: tmp, mountPath: /tmp}
+                - {name: shm, mountPath: /dev/shm}
+              resources:
+                requests: {cpu: 100m, memory: 512Mi}
+                limits: {cpu: "1", memory: 1536Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: {drop: [ALL]}
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: pilke-venue-sources
+            - name: tmp
+              emptyDir:
+                sizeLimit: 1Gi
+            - name: shm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 512Mi

@@ -37,6 +37,9 @@ spec:
                   - pilke-migrate
                   # The hourly logical dump, `../../app/db-dump.yaml`.
                   - pilke-db-dump
+                  # The venue hours sync's CronJobs, `../../app/venue-sources.yaml`.
+                  # Left out, every run fails at its first query.
+                  - pilke-venue-sources
       ports:
         - protocol: TCP
           port: 5432

@@ -343,6 +343,29 @@ createdb treffit && psql -d treffit -c 'CREATE EXTENSION postgis'
 pg_restore --no-owner --role=treffit -d treffit treffit-<stamp>.dump
 ```
 
+## The venue hours sync
+
+`app/venue-sources.yaml`: two CronJobs running `manage.py venue_sources --record`
+from **`ghcr.io/boissit/treffit-backend-sync`** (the backend's `Dockerfile.sync`,
+which adds Playwright and Chromium; CI publishes it beside the server image with
+the same `sha-<7>` tags), on one 2 Gi `iscsi` volume that holds the previous run's
+proposal file and the fetch cache. Weekly on Mondays at 06:00 Helsinki time, and
+on the 1st at 09:00 with `--google`. Each change it reads lands in the admin's
+*Venues › Hours proposals* (`https://pilke.internal/admin/`); the owner is mailed
+at `MAIL_FEEDBACK_TO` when a run found something. treffit-backend
+`docs/venues.md` §5–§6.
+
+⚠️ Both arrive **suspended** with a placeholder tag. Turning them on is one commit:
+both `image:` tags set to the release that carries the hours queue (the same
+`sha-` as the Deployments, migration `venues.0021` included) and both
+`suspend: true` lines removed.
+
+```bash
+kubectl -n pilke get cronjob -l app=pilke-venue-sources
+kubectl -n pilke create job --from=cronjob/pilke-venue-sources-weekly sources-now
+kubectl -n pilke logs -f job/sources-now        # counts, "Recorded: N proposals raised…"
+```
+
 ## Network policies
 
 `prerequisites/network-policy/`, in two stages, and **whether either does
