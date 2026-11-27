@@ -355,11 +355,6 @@ on the 1st at 09:00 with `--google`. Each change it reads lands in the admin's
 at `MAIL_FEEDBACK_TO` when a run found something. treffit-backend
 `docs/venues.md` §5–§6.
 
-⚠️ Both arrive **suspended** with a placeholder tag. Turning them on is one commit:
-both `image:` tags set to the release that carries the hours queue (the same
-`sha-` as the Deployments, migration `venues.0021` included) and both
-`suspend: true` lines removed.
-
 ```bash
 kubectl -n pilke get cronjob -l app=pilke-venue-sources
 kubectl -n pilke create job --from=cronjob/pilke-venue-sources-weekly sources-now
