@@ -72,7 +72,7 @@ spec:
             - name: ghcr-pull
           containers:
             - name: venue-sources
-              image: ghcr.io/boissit/treffit-backend-sync:sha-51bc1c2
+              image: ghcr.io/boissit/treffit-backend-sync:sha-ef89036
               command: ["python", "manage.py", "venue_sources", "--record", "--dir", "/data"]
               envFrom:
                 - configMapRef:
@@ -152,7 +152,7 @@ spec:
             - name: ghcr-pull
           containers:
             - name: venue-sources
-              image: ghcr.io/boissit/treffit-backend-sync:sha-51bc1c2
+              image: ghcr.io/boissit/treffit-backend-sync:sha-ef89036
               command: ["python", "manage.py", "venue_sources", "--record", "--google", "--dir", "/data"]
               envFrom:
                 - configMapRef:
